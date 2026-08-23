@@ -26,23 +26,16 @@ dependencies {
     testImplementation("org.postgresql:postgresql")
 }
 
-// spring-dotenv reads `.env` relative to the working directory, and Gradle
-// runs bootRun from the subproject dir. The file lives at the repo root, so
-// without this the app silently starts with no credentials and falls back to
-// each provider's default model.
-tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
-    workingDir = rootProject.projectDir
-}
-
-// Integration tests that hit a live LLM read their configuration from the
-// project .env, the same file the application uses. Sourcing it into the shell
-// is not enough: the Gradle daemon is long-lived, so test JVMs forked from it
-// inherit the daemon's (stale) environment rather than yours. Reading the file
-// here via a value source keeps it deterministic and configuration-cache safe.
+// Both bootRun and the tests take their LLM configuration from the project
+// .env, the same file the application reads. Sourcing it into your shell is not
+// enough: the Gradle daemon is long-lived, so forked JVMs inherit the daemon's
+// (stale) environment rather than yours. Reading the file here via a value
+// source keeps it deterministic and configuration-cache safe.
 val dotEnv: Provider<String> =
     providers.fileContents(rootProject.layout.projectDirectory.file(".env")).asText
 
-tasks.withType<Test>().configureEach {
+/** Applies every KEY=VALUE from the project .env as a process environment variable. */
+fun org.gradle.process.ProcessForkOptions.applyDotEnv() {
     dotEnv.orNull?.lineSequence()
         ?.map { it.trim() }
         ?.filter { it.isNotEmpty() && !it.startsWith("#") && "=" in it }
@@ -51,6 +44,20 @@ tasks.withType<Test>().configureEach {
             val value = line.substringAfter("=").trim()
             if (key.isNotEmpty()) environment(key, value)
         }
+}
+
+tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
+    // spring-dotenv resolves `.env` relative to the working directory, and
+    // Gradle runs bootRun from the subproject. Point it at the repo root...
+    workingDir = rootProject.projectDir
+    // ...and pass the values explicitly too, so the app never depends on that
+    // discovery rule. Without either, it starts with no credentials and
+    // silently falls back to the provider's default model.
+    applyDotEnv()
+}
+
+tasks.withType<Test>().configureEach {
+    applyDotEnv()
 
     // Gradle does not track a Test task's environment as an input, so without
     // this the build cache happily replays a result produced when these

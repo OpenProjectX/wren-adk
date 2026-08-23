@@ -2,6 +2,8 @@ package org.openprojectx.wren.adk.autoconfigure
 
 import com.google.adk.agents.LlmAgent
 import com.google.adk.models.BaseLlm
+import com.google.adk.plugins.BasePlugin
+import com.google.adk.plugins.LoggingPlugin
 import com.google.adk.artifacts.InMemoryArtifactService
 import com.google.adk.memory.InMemoryMemoryService
 import com.google.adk.runner.Runner
@@ -118,6 +120,20 @@ class WrenAdkAutoConfiguration {
         }
     }
 
+    /**
+     * ADK's own tracing plugin. `RunnerService` takes `List<BasePlugin>` by
+     * constructor injection, so declaring this bean is enough for it to reach
+     * the Dev UI's runners — though on ADK 1.8.0 it emits nothing there. See
+     * [WrenAdkProperties.verbose].
+     */
+    @Bean
+    @ConditionalOnMissingBean(LoggingPlugin::class)
+    @ConditionalOnProperty(prefix = "wren.adk", name = ["verbose"], havingValue = "true")
+    fun wrenLoggingPlugin(): BasePlugin {
+        log.info("wren.adk.verbose=true — registering ADK LoggingPlugin")
+        return LoggingPlugin()
+    }
+
     @Bean
     @ConditionalOnMissingBean
     fun wrenSessionService(): BaseSessionService = InMemorySessionService()
@@ -128,11 +144,13 @@ class WrenAdkAutoConfiguration {
         agent: LlmAgent,
         sessionService: BaseSessionService,
         properties: WrenAdkProperties,
+        plugins: List<BasePlugin>,
     ): Runner = Runner.builder()
         .agent(agent)
         .appName(properties.appName)
         .artifactService(InMemoryArtifactService())
         .sessionService(sessionService)
         .memoryService(InMemoryMemoryService())
+        .plugins(plugins)
         .build()
 }

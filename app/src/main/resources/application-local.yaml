@@ -30,6 +30,12 @@ wren:
     # cannot write NL->SQL pairs back into the project by accident.
     read-only: true
 
+    # Registers ADK's LoggingPlugin. NOTE: on ADK 1.8.0 it emits nothing through
+    # the Dev UI path (verified at TRACE, bean present). The useful tracing
+    # comes from the log levels below. Kept enabled locally so it starts working
+    # the moment ADK invokes plugin callbacks there.
+    verbose: true
+
     anthropic:
       api-key: ${env.ANTHROPIC_API_KEY:${ANTHROPIC_API_KEY:}}
       auth-token: ${env.ANTHROPIC_AUTH_TOKEN:${ANTHROPIC_AUTH_TOKEN:}}
@@ -53,7 +59,36 @@ wren:
       project-home: ${env.WREN_PROJECT_HOME:${WREN_PROJECT_HOME:/data/Git/WrenAI-demo}}
 
 logging:
+  pattern:
+    console: "%clr(%d{HH:mm:ss.SSS}){faint} %clr(%-5p) %clr(%-32.32logger{0}){cyan} %m%n%wEx"
   level:
+    root: INFO
+
+    # --- what the agent decided -------------------------------------------
+    # THE trace. `Claude` logs each model response; `BaseLlmFlow` logs the event
+    # it becomes, including the tool the model chose and its arguments, e.g.
+    #   functionCalls: [FunctionCall{id=toolu_..., name=run_sql,
+    #                   args={sql=SELECT COUNT(*) AS order_count FROM orders}}]
+    com.google.adk.models: DEBUG
+    com.google.adk.flows.llmflows: DEBUG
+
+    # ADK's LoggingPlugin lives here. Silent on 1.8.0 via the Dev UI; left at
+    # DEBUG so it appears if that changes.
+    com.google.adk.plugins: DEBUG
+    com.google.adk.runner: DEBUG
+    com.google.adk.tools: DEBUG
+
+    # --- the wire ----------------------------------------------------------
+    # JSON-RPC to and from `wren serve mcp`, and the tool list it advertises.
+    io.modelcontextprotocol: DEBUG
+    # Anthropic SDK: status and timing. It does not log bodies, so the token
+    # is not exposed here.
+    com.anthropic: DEBUG
+
+    # This project: MCP settings resolution, skill-guide loading.
     org.openprojectx.wren.adk: DEBUG
-    # Uncomment to see every MCP frame:
-    # io.modelcontextprotocol: DEBUG
+
+    # --- keep the trace readable -------------------------------------------
+    org.springframework: INFO
+    org.apache.catalina: WARN
+    org.apache.tomcat: WARN

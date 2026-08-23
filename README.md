@@ -3,7 +3,8 @@
 A Spring Boot starter that gives a [Google ADK](https://github.com/google/adk-java)
 agent governed access to a warehouse through the
 [Wren](https://github.com/Canner/WrenAI) semantic layer — plus Google ADK's
-built-in Dev UI for exercising it.
+built-in Dev UI for exercising it, plus a production-oriented React/A2UI
+client for richer interaction.
 
 The agent writes SQL against **model names**. Wren expands each model into a
 CTE, resolves the real schema, prunes columns and translates dialect, so the
@@ -11,11 +12,12 @@ model never has to know the physical table layout — and cannot query anything
 outside the MDL.
 
 ```
-ADK Dev UI ──SSE──▶ Spring Boot app ──ADK──▶ LLM
-                       │
-                       │ MCP (stdio or streamable HTTP)
-                       ▼
-                  wren serve mcp ──▶ Postgres / BigQuery / Snowflake / …
+React + A2UI ─┐
+              ├──SSE──▶ Spring Boot app ──ADK──▶ LLM
+ADK Dev UI ───┘              │
+                             │ MCP (stdio or streamable HTTP)
+                             ▼
+                        wren serve mcp ──▶ Postgres / BigQuery / Snowflake / …
 ```
 
 ## Modules
@@ -26,6 +28,7 @@ ADK Dev UI ──SSE──▶ Spring Boot app ──ADK──▶ LLM
 | `autoconfigure` | `wren-adk-spring-boot-autoconfigure` | `@AutoConfiguration`, `wren.adk.*` properties |
 | `starter` | `wren-adk-spring-boot-starter` | Dependency aggregator |
 | `app` | — | ADK Dev UI host, Jib image, integration tests |
+| `ui` | `@openprojectx/wren-adk-ui` | Bun, Vite, React and the official A2UI renderer |
 
 ## Quick start
 
@@ -37,6 +40,18 @@ cp .env.example .env      # fill in ANTHROPIC_API_KEY and WREN_PROJECT_HOME
 Open <http://localhost:8080/dev-ui>. The application registers the
 Spring-created `wren_analyst` with ADK's `AgentStaticLoader`; ADK supplies the
 browser assets, session API, SSE execution endpoint, traces, and evaluation UI.
+
+For the richer application UI, run a second terminal:
+
+```shell
+cd ui
+bun install
+bun run dev
+```
+
+Then open <http://localhost:5173>. Vite proxies the ADK API to the Spring app,
+while `@a2ui/react` renders interactive v0.9/v0.9.1 surfaces. See
+[`ui/README.md`](ui/README.md) for production configuration.
 
 > **Development only.** Google documents ADK's Dev UI as a development and
 > debugging tool, not a production frontend. Put it behind appropriate network
@@ -197,6 +212,51 @@ Docker daemon rather than a registry.
 
 The image runs as uid 10001 (non-root), exposes 8080, and sets
 `WREN_PROJECT_HOME=/project` — mount your Wren project there.
+
+## Local development
+
+```shell
+cp .env.example .env      # fill in the LLM credentials
+./gradlew :app:bootRun --args='--spring.profiles.active=local'
+```
+
+Opens ADK's Dev UI on <http://localhost:8080>. The `local` profile points at a
+Wren project on disk (`/data/Git/WrenAI-demo` by default — override with
+`WREN_PROJECT_HOME`), spawns `wren serve mcp` over STDIO, and turns on verbose
+tracing.
+
+`bootRun` reads `.env` two ways: its working directory is set to the repo root
+so spring-dotenv finds the file, *and* the values are passed as process
+environment variables. Sourcing `.env` into your shell is not sufficient — the
+Gradle daemon is long-lived, so forked JVMs inherit its stale environment.
+
+### Reading the trace
+
+`wren.adk.verbose` plus the log levels in `application-local.yaml` produce a
+turn-by-turn trace. The line that matters most shows the tool the model chose
+and the SQL it wrote:
+
+```
+DEBUG Claude       Claude response: Message{id=msg_…, content=[…]}
+DEBUG BaseLlmFlow  event: {…"functionCalls":[FunctionCall{id=toolu_…,
+                   name=run_sql, args={sql=SELECT COUNT(*) AS order_count
+                   FROM orders}}]…}
+DEBUG BaseLlmFlow  Ending flow execution based on final response
+```
+
+`io.modelcontextprotocol` at DEBUG adds the raw JSON-RPC to and from
+`wren serve mcp`, including the tool schemas it advertises — decisive when a
+tool call misbehaves.
+
+> `wren.adk.verbose` registers ADK's `LoggingPlugin`, which would give a
+> purpose-built trace. On **ADK 1.8.0 it emits nothing through the Dev UI**:
+> verified at TRACE with the bean confirmed present and created before the
+> runner, even though `RunnerService` does call `Runner.Builder.plugins(...)`.
+> The log levels above are what actually produce the trace. The bean is kept
+> because the wiring is correct and costs nothing.
+
+Verbose tracing logs prompts and tool payloads, so it is off by default and
+enabled only in the `local` profile.
 
 ## Tests
 

@@ -31,6 +31,21 @@ data class WrenAdkProperties(
      * can still explore the schema and plan SQL. Useful for a dry-run tier.
      */
     val transpileOnly: Boolean = false,
+    /**
+     * Register ADK's [com.google.adk.plugins.LoggingPlugin] as a `BasePlugin`
+     * bean. `RunnerService` injects every such bean into the runners it builds,
+     * so it reaches the Dev UI's runners as well as [wrenRunner].
+     *
+     * Measured caveat: on ADK 1.8.0 the plugin emits nothing through the Dev UI
+     * path — verified at TRACE on `com.google.adk.plugins.LoggingPlugin` with
+     * the bean confirmed present and created before the runner. Agent tracing
+     * therefore comes from log levels (see `application-local.yaml`), not from
+     * this. The bean is kept because the wiring is correct and costs nothing;
+     * revisit when ADK invokes plugin callbacks in that flow.
+     *
+     * Off by default regardless: plugin tracing logs prompts and tool payloads.
+     */
+    val verbose: Boolean = false,
     val mcp: Mcp = Mcp(),
     val skills: Skills = Skills(),
     val anthropic: Anthropic = Anthropic(),

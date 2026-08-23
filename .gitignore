@@ -49,3 +49,7 @@ bin/
 ### Local secrets ###
 .env
 /http-client.private.env.json
+
+### Bun / Vite ###
+/ui/node_modules/
+/ui/dist/
