@@ -35,6 +35,12 @@ export type AdkEvent = {
   };
 };
 
+export type AdkToolResult = {
+  id?: string;
+  name: string;
+  error?: string;
+};
+
 type Session = {
   id: string;
 };
@@ -75,6 +81,18 @@ export async function createAdkSession(userId: string): Promise<Session> {
   }
 
   return (await response.json()) as Session;
+}
+
+export async function reportA2uiDiagnostic(message: string, surfaceId?: string): Promise<void> {
+  try {
+    await fetch(apiUrl("/ui/diagnostics/a2ui"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: message.slice(0, 4096), surfaceId }),
+    });
+  } catch {
+    // Diagnostics must never interrupt the active ADK stream.
+  }
 }
 
 function parseSseBlock(block: string): AdkEvent | undefined {
@@ -221,6 +239,31 @@ export function readToolNames(event: AdkEvent): string[] {
   return (event.content?.parts ?? [])
     .map((part) => part.functionCall?.name)
     .filter((name): name is string => Boolean(name));
+}
+
+function findToolError(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const error = findToolError(item);
+      if (error) return error;
+    }
+    return undefined;
+  }
+  if (!isRecord(value)) return undefined;
+  if (typeof value.error === "string" && value.error.trim()) return value.error;
+  for (const item of Object.values(value)) {
+    const error = findToolError(item);
+    if (error) return error;
+  }
+  return undefined;
+}
+
+export function readToolResults(event: AdkEvent): AdkToolResult[] {
+  return (event.content?.parts ?? []).flatMap((part) => {
+    const response = part.functionResponse;
+    if (!response?.name) return [];
+    return [{ id: response.id, name: response.name, error: findToolError(response.response) }];
+  });
 }
 
 export { APP_NAME };

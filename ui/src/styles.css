@@ -773,10 +773,59 @@ button:disabled {
   margin-top: 2px;
   color: #8a94a3;
   font-size: 9px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .activity-check {
   color: var(--success);
+}
+
+.activity-failed {
+  border-color: #f0c8c4;
+  background: #fff8f7;
+}
+
+.activity-failed .activity-icon,
+.activity-error {
+  color: var(--danger);
+}
+
+.activity-failed span {
+  color: #9b4038;
+}
+
+.activity-running {
+  color: var(--accent);
+}
+
+.tool-error-banner {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  width: min(100%, 760px);
+  margin: 0 auto 18px;
+  padding: 12px 14px;
+  color: #8d352e;
+  background: #fff8f7;
+  border: 1px solid #f0c8c4;
+  border-radius: 8px;
+}
+
+.tool-error-banner strong,
+.tool-error-banner span {
+  display: block;
+}
+
+.tool-error-banner strong {
+  margin-bottom: 3px;
+  font-size: 12px;
+}
+
+.tool-error-banner span {
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .guardrail-card {

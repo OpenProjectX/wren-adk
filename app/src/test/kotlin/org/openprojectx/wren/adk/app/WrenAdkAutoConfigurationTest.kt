@@ -85,4 +85,21 @@ class WrenAdkAutoConfigurationTest {
         assertEquals(HttpStatus.OK.value(), devUi.statusCode())
         assertTrue(devUi.body().contains("<title>Agent Development Kit Dev UI</title>"))
     }
+
+    @Test
+    fun `the UI can report A2UI renderer errors to the server log`() {
+        val response = HttpClient.newHttpClient().send(
+            HttpRequest.newBuilder(URI("http://localhost:$port/ui/diagnostics/a2ui"))
+                .header("Content-Type", "application/json")
+                .POST(
+                    HttpRequest.BodyPublishers.ofString(
+                        """{"message":"Validation failed for List","surfaceId":"result"}""",
+                    ),
+                )
+                .build(),
+            HttpResponse.BodyHandlers.discarding(),
+        )
+
+        assertEquals(HttpStatus.NO_CONTENT.value(), response.statusCode())
+    }
 }

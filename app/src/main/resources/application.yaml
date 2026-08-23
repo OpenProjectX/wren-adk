@@ -51,5 +51,9 @@ wren:
       url: ${env.WREN_MCP_URL:${WREN_MCP_URL:http://127.0.0.1:8080/mcp}}
 
 logging:
+  pattern:
+    # Full logger name plus caller line. Caller lookup has a small cost but is
+    # useful while tracing ADK's multi-step tool loop.
+    console: "%clr(%d{HH:mm:ss.SSS}){faint} %clr(%-5p) %clr(%logger:%line){cyan} %m%n%wEx"
   level:
     org.openprojectx.wren.adk: INFO

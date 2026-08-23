@@ -9,6 +9,7 @@ export default defineConfig({
       "/list-apps": "http://localhost:8080",
       "/apps": "http://localhost:8080",
       "/run_sse": "http://localhost:8080",
+      "/ui/diagnostics": "http://localhost:8080",
     },
   },
 });

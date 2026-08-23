@@ -6,11 +6,14 @@ import { basicCatalog } from "@a2ui/react/v0_9";
 import { starterSurfaceMessages } from "../lib/a2ui";
 
 type ActionHandler = (action: A2uiClientAction) => void | Promise<void>;
+type ErrorHandler = (error: unknown) => void;
 
-export function useA2ui(onAction: ActionHandler) {
+export function useA2ui(onAction: ActionHandler, onError: ErrorHandler) {
   const actionHandler = useRef(onAction);
+  const errorHandler = useRef(onError);
   const starterLoaded = useRef(false);
   actionHandler.current = onAction;
+  errorHandler.current = onError;
 
   const [processor] = useState(
     () =>
@@ -29,8 +32,12 @@ export function useA2ui(onAction: ActionHandler) {
   const processMessages = useCallback(
     (messages: A2uiMessage[]) => {
       if (messages.length === 0) return;
-      processor.processMessages(messages);
-      syncSurfaces();
+      try {
+        processor.processMessages(messages);
+        syncSurfaces();
+      } catch (error) {
+        errorHandler.current(error);
+      }
     },
     [processor, syncSurfaces],
   );

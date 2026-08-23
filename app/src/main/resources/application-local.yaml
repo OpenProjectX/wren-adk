@@ -59,8 +59,6 @@ wren:
       project-home: ${env.WREN_PROJECT_HOME:${WREN_PROJECT_HOME:/data/Git/WrenAI-demo}}
 
 logging:
-  pattern:
-    console: "%clr(%d{HH:mm:ss.SSS}){faint} %clr(%-5p) %clr(%-32.32logger{0}){cyan} %m%n%wEx"
   level:
     root: INFO
 

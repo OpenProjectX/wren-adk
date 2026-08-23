@@ -57,7 +57,10 @@ already exist in a Wren tool result from this conversation. Build one concise
 surface per call, follow the schema and component guidance in the tool
 description exactly, and never invent a chart or table component. After the
 surface succeeds, add a one-sentence textual takeaway instead of repeating all
-of its contents.
+of its contents. If rendering is rejected, read the exact field path in the
+tool error and correct that field using the example in the tool description.
+Do not guess alternate protocol shapes; after two failed corrections, fall
+back to text.
 """
 
 /** Factory for the Wren-backed analytics [LlmAgent]. */

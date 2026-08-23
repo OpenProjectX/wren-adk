@@ -28,6 +28,8 @@ import {
   readA2uiMessages,
   readText,
   readToolNames,
+  readToolResults,
+  reportA2uiDiagnostic,
   runAdkTurn,
 } from "./lib/adk";
 
@@ -43,7 +45,10 @@ type ChatMessage = {
 
 type ToolActivity = {
   id: string;
+  callId?: string;
   name: string;
+  status: "running" | "completed" | "failed";
+  error?: string;
 };
 
 const USER_ID = `wren-ui-${crypto.randomUUID()}`;
@@ -83,6 +88,7 @@ function App() {
   const [sessionError, setSessionError] = useState<string>();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activity, setActivity] = useState<ToolActivity[]>([]);
+  const [toolError, setToolError] = useState<{ name: string; message: string }>();
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -94,7 +100,12 @@ function App() {
   const handleA2uiAction = useCallback((action: A2uiClientAction) => {
     void sendPromptRef.current(promptForAction(action));
   }, []);
-  const { surfaces, processMessages } = useA2ui(handleA2uiAction);
+  const handleA2uiError = useCallback((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    setToolError({ name: "A2UI renderer", message });
+    void reportA2uiDiagnostic(message);
+  }, []);
+  const { surfaces, processMessages } = useA2ui(handleA2uiAction, handleA2uiError);
 
   const startSession = useCallback(async () => {
     abortController.current?.abort();
@@ -103,6 +114,7 @@ function App() {
     setSessionId(undefined);
     setMessages([]);
     setActivity([]);
+    setToolError(undefined);
 
     try {
       const session = await createAdkSession(USER_ID);
@@ -145,6 +157,7 @@ function App() {
       setInput("");
       setBusy(true);
       setSessionError(undefined);
+      setToolError(undefined);
       setSidebarOpen(false);
 
       const controller = new AbortController();
@@ -168,8 +181,42 @@ function App() {
             if (toolNames.length > 0) {
               setActivity((current) => [
                 ...current,
-                ...toolNames.map((name) => ({ id: crypto.randomUUID(), name })),
+                ...toolNames.map((name) => ({
+                  id: crypto.randomUUID(),
+                  name,
+                  status: "running" as const,
+                })),
               ]);
+            }
+
+            const toolResults = readToolResults(event);
+            if (toolResults.length > 0) {
+              const latestError = [...toolResults].reverse().find((result) => result.error);
+              if (latestError?.error) {
+                setToolError({ name: latestError.name, message: latestError.error });
+              }
+              setActivity((current) => {
+                const next = [...current];
+                for (const result of toolResults) {
+                  let index = -1;
+                  for (let candidate = next.length - 1; candidate >= 0; candidate -= 1) {
+                    if (next[candidate].name === result.name && next[candidate].status === "running") {
+                      index = candidate;
+                      break;
+                    }
+                  }
+                  const completed: ToolActivity = {
+                    id: index >= 0 ? next[index].id : crypto.randomUUID(),
+                    callId: result.id,
+                    name: result.name,
+                    status: result.error ? "failed" : "completed",
+                    error: result.error,
+                  };
+                  if (index >= 0) next[index] = completed;
+                  else next.push(completed);
+                }
+                return next;
+              });
             }
 
             const text = readText(event);
@@ -324,6 +371,16 @@ function App() {
               </div>
             )}
 
+            {toolError && (
+              <div className="tool-error-banner" role="status">
+                <CircleAlert size={18} aria-hidden="true" />
+                <div>
+                  <strong>{toolError.name} rejected output</strong>
+                  <span>{toolError.message}</span>
+                </div>
+              </div>
+            )}
+
             <section className="transcript" aria-live="polite" aria-label="Conversation">
               {messages.map((message) => (
                 <article className={`message message-${message.role} ${message.error ? "message-error" : ""}`} key={message.id}>
@@ -402,10 +459,21 @@ function App() {
                   </div>
                 ) : (
                   latestTools.map((tool) => (
-                    <div className="activity-item" key={tool.id}>
+                    <div className={`activity-item activity-${tool.status}`} key={tool.id}>
                       <div className="activity-icon"><Wrench size={14} aria-hidden="true" /></div>
-                      <div><strong>{tool.name}</strong><span>Completed</span></div>
-                      <Check size={14} className="activity-check" aria-hidden="true" />
+                      <div>
+                        <strong>{tool.name}</strong>
+                        <span title={tool.error}>
+                          {tool.error ?? (tool.status === "running" ? "Running" : "Completed")}
+                        </span>
+                      </div>
+                      {tool.status === "failed" ? (
+                        <CircleAlert size={14} className="activity-error" aria-hidden="true" />
+                      ) : tool.status === "running" ? (
+                        <LoaderCircle size={14} className="activity-running spin" aria-hidden="true" />
+                      ) : (
+                        <Check size={14} className="activity-check" aria-hidden="true" />
+                      )}
                     </div>
                   ))
                 )}

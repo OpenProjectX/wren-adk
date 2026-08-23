@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readA2uiMessages } from "./adk";
+import { readA2uiMessages, readToolResults } from "./adk";
 
 describe("ADK A2UI event parsing", () => {
   test("extracts messages returned by render_a2ui", () => {
@@ -44,5 +44,31 @@ describe("ADK A2UI event parsing", () => {
     });
 
     expect(extracted).toEqual([]);
+  });
+
+  test("exposes a rejected A2UI response as a failed tool result", () => {
+    const results = readToolResults({
+      content: {
+        parts: [
+          {
+            functionResponse: {
+              id: "call-1",
+              name: "render_a2ui",
+              response: {
+                error: "The A2UI surface was rejected: updateComponents.surfaceId is missing.",
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    expect(results).toEqual([
+      {
+        id: "call-1",
+        name: "render_a2ui",
+        error: "The A2UI surface was rejected: updateComponents.surfaceId is missing.",
+      },
+    ]);
   });
 });

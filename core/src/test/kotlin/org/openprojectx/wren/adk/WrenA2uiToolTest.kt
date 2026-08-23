@@ -105,6 +105,43 @@ class WrenA2uiToolTest {
     }
 
     @Test
+    fun `the legacy props wrapper is rejected with migration guidance`() {
+        val messages = validMessages.map { message ->
+            val update = message["updateComponents"] as? Map<*, *> ?: return@map message
+            message + ("updateComponents" to (update + ("components" to listOf(
+                mapOf(
+                    "id" to "root",
+                    "component" to "Text",
+                    "props" to mapOf("text" to "Move me"),
+                ),
+            ))))
+        }
+
+        val result = WrenA2uiTool().renderResult(mapOf("messages" to messages))
+
+        assertTrue(result["error"].toString().contains("unrecognized fields [props]"))
+    }
+
+    @Test
+    fun `invalid list fields are rejected on the server before reaching React`() {
+        val messages = validMessages.map { message ->
+            val update = message["updateComponents"] as? Map<*, *> ?: return@map message
+            message + ("updateComponents" to (update + ("components" to listOf(
+                mapOf(
+                    "id" to "root",
+                    "component" to "List",
+                    "items" to listOf(mapOf("path" to "/rows")),
+                    "template" to mapOf("component" to "Row"),
+                ),
+            ))))
+        }
+
+        val result = WrenA2uiTool().renderResult(mapOf("messages" to messages))
+
+        assertTrue(result["error"].toString().contains("unrecognized fields [items, template]"))
+    }
+
+    @Test
     fun `mixed surface batches are rejected`() {
         val messages = validMessages.mapIndexed { index, message ->
             if (index == 0) message else {
@@ -116,5 +153,19 @@ class WrenA2uiToolTest {
         assertFailsWith<IllegalArgumentException> {
             WrenA2uiTool.validateBatch(messages)
         }
+    }
+
+    @Test
+    fun `missing operation surface id identifies the exact message path`() {
+        val messages = validMessages.mapIndexed { index, message ->
+            if (index == 0) message else {
+                val update = message["updateComponents"] as Map<*, *>
+                message + ("updateComponents" to (update - "surfaceId"))
+            }
+        }
+
+        val result = WrenA2uiTool().renderResult(mapOf("messages" to messages))
+
+        assertTrue(result["error"].toString().contains("messages[1].updateComponents.surfaceId"))
     }
 }
