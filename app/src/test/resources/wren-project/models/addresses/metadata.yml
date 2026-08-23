@@ -1,0 +1,29 @@
+name: addresses
+table_reference:
+  catalog: ''
+  schema: wrenai
+  table: addresses
+columns:
+- name: address_id
+  type: INT
+  not_null: true
+- name: customer_id
+  type: INT
+  not_null: true
+- name: line1
+  type: VARCHAR(120)
+  not_null: true
+- name: city
+  type: VARCHAR(60)
+  not_null: true
+- name: postal_code
+  type: VARCHAR(16)
+- name: country
+  type: VARCHAR(2)
+  not_null: true
+- name: is_default
+  type: BOOLEAN
+  not_null: true
+primary_key: address_id
+properties:
+  description: Shipping addresses; a customer may have several.

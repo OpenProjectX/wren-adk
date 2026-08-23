@@ -1,0 +1,39 @@
+name: customers
+table_reference:
+  catalog: ''
+  schema: wrenai
+  table: customers
+columns:
+- name: customer_id
+  type: INT
+  not_null: true
+- name: email
+  type: VARCHAR(120)
+  not_null: true
+- name: first_name
+  type: VARCHAR(60)
+  not_null: true
+- name: last_name
+  type: VARCHAR(60)
+  not_null: true
+- name: country
+  type: VARCHAR(2)
+  not_null: true
+  properties:
+    description: ISO 3166-1 alpha-2 country code.
+- name: city
+  type: VARCHAR(60)
+- name: segment
+  type: VARCHAR(12)
+  not_null: true
+  properties:
+    description: 'Lifecycle segment: consumer, smb, enterprise.'
+- name: signup_date
+  type: DATE
+  not_null: true
+- name: is_active
+  type: BOOLEAN
+  not_null: true
+primary_key: customer_id
+properties:
+  description: Registered shoppers.

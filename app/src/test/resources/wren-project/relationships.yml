@@ -1,0 +1,55 @@
+relationships:
+- name: addresses_customer_id
+  models:
+  - addresses
+  - customers
+  join_type: many_to_one
+  condition: addresses.customer_id = customers.customer_id
+- name: order_items_order_id
+  models:
+  - order_items
+  - orders
+  join_type: many_to_one
+  condition: order_items.order_id = orders.order_id
+- name: order_items_product_id
+  models:
+  - order_items
+  - products
+  join_type: many_to_one
+  condition: order_items.product_id = products.product_id
+- name: orders_address_id
+  models:
+  - orders
+  - addresses
+  join_type: many_to_one
+  condition: orders.address_id = addresses.address_id
+- name: orders_customer_id
+  models:
+  - orders
+  - customers
+  join_type: many_to_one
+  condition: orders.customer_id = customers.customer_id
+- name: payments_order_id
+  models:
+  - payments
+  - orders
+  join_type: many_to_one
+  condition: payments.order_id = orders.order_id
+- name: products_category_id
+  models:
+  - products
+  - categories
+  join_type: many_to_one
+  condition: products.category_id = categories.category_id
+- name: reviews_customer_id
+  models:
+  - reviews
+  - customers
+  join_type: many_to_one
+  condition: reviews.customer_id = customers.customer_id
+- name: reviews_product_id
+  models:
+  - reviews
+  - products
+  join_type: many_to_one
+  condition: reviews.product_id = products.product_id

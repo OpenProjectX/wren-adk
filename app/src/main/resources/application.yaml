@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: wren-adk
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: 8080
+
+wren:
+  adk:
+    # Requires GOOGLE_API_KEY, or Vertex AI credentials in the environment.
+    model: ${WREN_ADK_MODEL:gemini-2.0-flash}
+    agent-name: wren_analyst
+    app-name: wren-adk
+    # Withhold Wren's store_query write tool. Flip only if the agent should
+    # persist confirmed NL->SQL pairs back into the project.
+    read-only: true
+    mcp:
+      # STDIO spawns `wren serve mcp` as a child process. The wrenai base image
+      # puts the CLI on PATH, so nothing extra is needed and nothing listens on
+      # the network. Switch to STREAMABLE_HTTP to talk to a sidecar or service.
+      transport: ${WREN_ADK_TRANSPORT:STDIO}
+      project-home: ${WREN_PROJECT_HOME:/project}
+      url: ${WREN_MCP_URL:http://127.0.0.1:8080/mcp}
+
+logging:
+  level:
+    org.openprojectx.wren.adk: INFO

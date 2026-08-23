@@ -1,0 +1,30 @@
+name: payments
+table_reference:
+  catalog: ''
+  schema: wrenai
+  table: payments
+columns:
+- name: payment_id
+  type: INT
+  not_null: true
+- name: order_id
+  type: INT
+  not_null: true
+- name: method
+  type: VARCHAR(16)
+  not_null: true
+  properties:
+    description: card, paypal, bank_transfer, gift_card.
+- name: status
+  type: VARCHAR(12)
+  not_null: true
+  properties:
+    description: captured, refunded, failed, pending.
+- name: amount
+  type: DECIMAL(12, 2)
+  not_null: true
+- name: paid_at
+  type: TIMESTAMP
+primary_key: payment_id
+properties:
+  description: Payment attempts against orders.

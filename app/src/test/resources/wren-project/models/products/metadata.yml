@@ -1,0 +1,40 @@
+name: products
+table_reference:
+  catalog: ''
+  schema: wrenai
+  table: products
+columns:
+- name: product_id
+  type: INT
+  not_null: true
+- name: category_id
+  type: INT
+  not_null: true
+- name: sku
+  type: VARCHAR(24)
+  not_null: true
+- name: name
+  type: VARCHAR(120)
+  not_null: true
+- name: unit_price
+  type: DECIMAL(10, 2)
+  not_null: true
+  properties:
+    description: List price per unit, USD.
+- name: unit_cost
+  type: DECIMAL(10, 2)
+  not_null: true
+  properties:
+    description: Cost of goods per unit, USD. Margin = unit_price - unit_cost.
+- name: stock_qty
+  type: INT
+  not_null: true
+- name: is_active
+  type: BOOLEAN
+  not_null: true
+- name: created_at
+  type: TIMESTAMP
+  not_null: true
+primary_key: product_id
+properties:
+  description: Sellable items in the catalogue.

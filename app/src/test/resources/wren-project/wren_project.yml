@@ -1,0 +1,6 @@
+schema_version: 5
+name: eshop_test
+version: '1.0'
+catalog: wren
+schema: public
+data_source: postgres

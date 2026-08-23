@@ -1,0 +1,30 @@
+name: reviews
+table_reference:
+  catalog: ''
+  schema: wrenai
+  table: reviews
+columns:
+- name: review_id
+  type: INT
+  not_null: true
+- name: product_id
+  type: INT
+  not_null: true
+- name: customer_id
+  type: INT
+  not_null: true
+- name: rating
+  type: INT
+  not_null: true
+  properties:
+    description: Star rating, 1 (worst) to 5 (best).
+- name: title
+  type: VARCHAR(120)
+- name: body
+  type: TEXT
+- name: created_at
+  type: TIMESTAMP
+  not_null: true
+primary_key: review_id
+properties:
+  description: Product reviews left by customers.

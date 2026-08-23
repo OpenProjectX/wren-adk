@@ -1,0 +1,36 @@
+name: order_metrics
+base_object: orders
+measures:
+  - name: revenue
+    expression: SUM(total_amount)
+    type: DOUBLE
+  - name: order_count
+    expression: COUNT(*)
+    type: BIGINT
+  - name: aov
+    expression: AVG(total_amount)
+    type: DOUBLE
+  - name: unique_customers
+    expression: COUNT(DISTINCT customer_id)
+    type: BIGINT
+  - name: discount_given
+    expression: SUM(discount_total)
+    type: DOUBLE
+dimensions:
+  - name: status
+    expression: status
+    type: VARCHAR
+  - name: channel
+    expression: channel
+    type: VARCHAR
+time_dimensions:
+  - name: order_date
+    expression: ordered_at
+    type: TIMESTAMP
+hierarchies:
+  time: [order_date]
+properties:
+  description: |
+    Order-level commercial metrics for the e-shop demo. Revenue is gross order
+    value including shipping, net of discounts, in USD. Note: includes all
+    statuses — filter to delivered/shipped for realised revenue.

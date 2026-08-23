@@ -1,0 +1,47 @@
+name: orders
+table_reference:
+  catalog: ''
+  schema: wrenai
+  table: orders
+columns:
+- name: order_id
+  type: INT
+  not_null: true
+- name: customer_id
+  type: INT
+  not_null: true
+- name: address_id
+  type: INT
+- name: order_date
+  type: DATE
+  not_null: true
+- name: ordered_at
+  type: TIMESTAMP
+  not_null: true
+- name: status
+  type: VARCHAR(12)
+  not_null: true
+  properties:
+    description: pending, processing, shipped, delivered, cancelled, returned.
+- name: channel
+  type: VARCHAR(12)
+  not_null: true
+  properties:
+    description: 'Acquisition channel: web, mobile_app, marketplace.'
+- name: currency
+  type: VARCHAR(3)
+  not_null: true
+- name: shipping_fee
+  type: DECIMAL(10, 2)
+  not_null: true
+- name: discount_total
+  type: DECIMAL(10, 2)
+  not_null: true
+- name: total_amount
+  type: DECIMAL(12, 2)
+  not_null: true
+  properties:
+    description: Gross order value incl. shipping, net of discounts, USD.
+primary_key: order_id
+properties:
+  description: Customer orders, one row per order.

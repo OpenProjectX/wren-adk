@@ -1,0 +1,6 @@
+# Integration tests drive Wren over HTTP against a Testcontainers instance,
+# so nothing is spawned in-process and the URL is injected at runtime.
+wren:
+  adk:
+    mcp:
+      transport: STREAMABLE_HTTP
