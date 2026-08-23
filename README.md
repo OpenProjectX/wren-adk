@@ -201,6 +201,12 @@ fixture, and Wren serving MCP over HTTP against it.
 ./gradlew :app:test
 ```
 
+Test tasks read the project `.env` directly. Sourcing it into your shell is not
+enough — the Gradle daemon is long-lived, so test JVMs inherit its stale
+environment rather than yours. The `.env` contents are also fingerprinted as a
+task input, otherwise the build cache replays a result produced when those
+variables were absent, and the live tests appear to "skip" forever.
+
 | Test | Asserts |
 |---|---|
 | `EshopFixtureTest` | Row counts, order totals reconcile to line items, no orphaned FKs, status enum |
@@ -210,6 +216,20 @@ fixture, and Wren serving MCP over HTTP against it.
 | `WrenSkillsTest` | Guide loading, front-matter stripping, and quiet degradation when the CLI is absent |
 | `AnthropicCompatibleLiveTest` | Live call against the configured endpoint — **skipped unless `ANTHROPIC_BASE_URL` is set** |
 | `WrenAgentLiveTest` | Full loop: model calls Wren tools, Wren queries Postgres, model answers from the result — also gated on `ANTHROPIC_BASE_URL` |
+
+### On tool-use reliability
+
+`WrenAgentLiveTest` asserts the agent actually *called* a tool, not merely that
+it produced a plausible answer. That check earns its keep: during development
+the model once replied `180` to a row count it had never queried — the real
+value is 212. A semantic layer only protects you if the model uses it.
+
+The instruction was hardened in response (it now states outright that the agent
+has no knowledge of the database and must call a tool before asserting any
+fact). Measured afterwards against qwen3.8-max on an Aliyun MaaS endpoint:
+**5/5 runs called `list_models` then `run_sql` and answered correctly.** Worth
+re-measuring if you change model or instruction — this is a model-behaviour
+property, not a code guarantee.
 
 The fixture (`app/src/test/resources/db/eshop.sql`, 1,120 rows across 8 tables)
 is a referentially-intact subset of the WrenAI demo dataset. **It is synthetic —

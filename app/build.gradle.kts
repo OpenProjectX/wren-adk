@@ -26,6 +26,31 @@ dependencies {
     testImplementation("org.postgresql:postgresql")
 }
 
+// Integration tests that hit a live LLM read their configuration from the
+// project .env, the same file the application uses. Sourcing it into the shell
+// is not enough: the Gradle daemon is long-lived, so test JVMs forked from it
+// inherit the daemon's (stale) environment rather than yours. Reading the file
+// here via a value source keeps it deterministic and configuration-cache safe.
+val dotEnv: Provider<String> =
+    providers.fileContents(rootProject.layout.projectDirectory.file(".env")).asText
+
+tasks.withType<Test>().configureEach {
+    dotEnv.orNull?.lineSequence()
+        ?.map { it.trim() }
+        ?.filter { it.isNotEmpty() && !it.startsWith("#") && "=" in it }
+        ?.forEach { line ->
+            val key = line.substringBefore("=").trim()
+            val value = line.substringAfter("=").trim()
+            if (key.isNotEmpty()) environment(key, value)
+        }
+
+    // Gradle does not track a Test task's environment as an input, so without
+    // this the build cache happily replays a result produced when these
+    // variables were absent — live tests would show as "skipped" forever.
+    inputs.property("dotEnvFingerprint", dotEnv.map { it.hashCode().toString() })
+        .optional(true)
+}
+
 // NOTE: the Jib plugin (3.5.4) is not Gradle configuration-cache compatible —
 // it fails with "Cannot invoke Project.getProjectDir() because this.project is
 // null". This build enables the configuration cache in gradle.properties, so

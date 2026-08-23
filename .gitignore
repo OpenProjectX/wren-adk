@@ -48,3 +48,4 @@ bin/
 
 ### Local secrets ###
 .env
+/http-client.private.env.json
