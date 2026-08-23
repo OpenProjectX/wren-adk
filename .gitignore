@@ -44,3 +44,7 @@ bin/
 ### Mac OS ###
 .DS_Store
 /.idea/
+/.env
+
+### Local secrets ###
+.env

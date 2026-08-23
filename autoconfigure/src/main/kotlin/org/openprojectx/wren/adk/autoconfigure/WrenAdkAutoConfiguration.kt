@@ -1,6 +1,7 @@
 package org.openprojectx.wren.adk.autoconfigure
 
 import com.google.adk.agents.LlmAgent
+import com.google.adk.models.BaseLlm
 import com.google.adk.artifacts.InMemoryArtifactService
 import com.google.adk.memory.InMemoryMemoryService
 import com.google.adk.runner.Runner
@@ -9,6 +10,9 @@ import com.google.adk.sessions.InMemorySessionService
 import com.google.adk.tools.mcp.McpToolset
 import org.openprojectx.wren.adk.DEFAULT_WREN_INSTRUCTION
 import org.openprojectx.wren.adk.WrenAgents
+import org.openprojectx.wren.adk.WrenAnthropicSettings
+import org.openprojectx.wren.adk.WrenGeminiSettings
+import org.openprojectx.wren.adk.WrenLlms
 import org.openprojectx.wren.adk.WrenMcpSettings
 import org.openprojectx.wren.adk.WrenToolsets
 import org.springframework.boot.autoconfigure.AutoConfiguration
@@ -52,11 +56,31 @@ class WrenAdkAutoConfiguration {
         )
     }
 
+    /**
+     * The model the agent runs on. Declare your own [BaseLlm] bean to use a
+     * provider this starter does not cover — ADK core also ships an
+     * OpenAI-compatible chat-completions client.
+     */
     @Bean
     @ConditionalOnMissingBean
-    fun wrenAgent(properties: WrenAdkProperties, toolset: McpToolset): LlmAgent =
+    fun wrenLlm(properties: WrenAdkProperties): BaseLlm = WrenLlms.create(
+        provider = properties.provider,
+        model = properties.resolvedModel(),
+        anthropic = WrenAnthropicSettings(
+            apiKey = properties.anthropic.apiKey,
+            baseUrl = properties.anthropic.baseUrl,
+            maxTokens = properties.anthropic.maxTokens,
+            timeout = properties.anthropic.timeout,
+            maxRetries = properties.anthropic.maxRetries,
+        ),
+        gemini = WrenGeminiSettings(apiKey = properties.gemini.apiKey),
+    )
+
+    @Bean
+    @ConditionalOnMissingBean
+    fun wrenAgent(properties: WrenAdkProperties, llm: BaseLlm, toolset: McpToolset): LlmAgent =
         WrenAgents.analyticsAgent(
-            model = properties.model,
+            llm = llm,
             toolset = toolset,
             name = properties.agentName,
             instruction = properties.instruction.ifBlank { DEFAULT_WREN_INSTRUCTION },

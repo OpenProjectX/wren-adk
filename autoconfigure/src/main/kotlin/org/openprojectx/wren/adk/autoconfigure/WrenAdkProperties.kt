@@ -1,5 +1,6 @@
 package org.openprojectx.wren.adk.autoconfigure
 
+import org.openprojectx.wren.adk.WrenLlmProvider
 import org.openprojectx.wren.adk.WrenTransport
 import org.springframework.boot.context.properties.ConfigurationProperties
 import java.time.Duration
@@ -7,8 +8,13 @@ import java.time.Duration
 /** Configuration for the Wren-backed ADK agent, bound from `wren.adk.*`. */
 @ConfigurationProperties(prefix = "wren.adk")
 data class WrenAdkProperties(
-    /** LLM driving the agent. Requires GOOGLE_API_KEY (or Vertex AI configuration). */
-    val model: String = "gemini-2.0-flash",
+    /** Which LLM backend to use. */
+    val provider: WrenLlmProvider = WrenLlmProvider.GEMINI,
+    /**
+     * Model name for [provider], e.g. `gemini-2.0-flash` or `claude-sonnet-4-5`.
+     * Blank picks a sensible default for the chosen provider.
+     */
+    val model: String = "",
     /** Agent name, surfaced in ADK events and traces. */
     val agentName: String = "wren_analyst",
     /** Application name used for ADK session scoping. */
@@ -26,7 +32,36 @@ data class WrenAdkProperties(
      */
     val transpileOnly: Boolean = false,
     val mcp: Mcp = Mcp(),
+    val anthropic: Anthropic = Anthropic(),
+    val gemini: Gemini = Gemini(),
 ) {
+    /** Resolved model name, falling back to a per-provider default. */
+    fun resolvedModel(): String = model.ifBlank {
+        when (provider) {
+            WrenLlmProvider.GEMINI -> "gemini-2.0-flash"
+            WrenLlmProvider.ANTHROPIC -> "claude-sonnet-4-5"
+        }
+    }
+
+    /**
+     * Gemini settings. Leave [apiKey] unset to read `GOOGLE_API_KEY` from the
+     * environment.
+     */
+    data class Gemini(val apiKey: String = "")
+
+    /**
+     * Anthropic settings. Leave [apiKey] unset to let the SDK read
+     * `ANTHROPIC_API_KEY` from the environment — which is what `.env` supplies.
+     */
+    data class Anthropic(
+        val apiKey: String = "",
+        /** Override to route through a gateway that speaks the Anthropic API. */
+        val baseUrl: String = "",
+        val maxTokens: Int = 8192,
+        val timeout: Duration = Duration.ofMinutes(2),
+        val maxRetries: Int = 2,
+    )
+
     /** How to reach the Wren MCP server. */
     data class Mcp(
         val transport: WrenTransport = WrenTransport.STDIO,

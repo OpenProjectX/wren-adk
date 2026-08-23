@@ -11,6 +11,7 @@ springBoot = "4.0.5"
 googleAdk = "1.8.0"
 jib = "3.5.4"
 testcontainers = "1.21.4"
+springDotenv = "5.1.0"
 
 [libraries]
 kotlinGradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
@@ -21,6 +22,7 @@ kotlinxSerialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-j
 kotlinxCoroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 
 googleAdk = { module = "com.google.adk:google-adk", version.ref = "googleAdk" }
+springDotenv = { module = "me.paulschwarz:spring-dotenv", version.ref = "springDotenv" }
 testcontainersBom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
 
 # Libraries can be bundled together for easier import

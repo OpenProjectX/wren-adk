@@ -29,32 +29,58 @@ browser ──SSE──▶ Spring Boot app ──ADK──▶ LLM
 
 ## Quick start
 
-The agent needs an LLM. Export `GOOGLE_API_KEY` (or configure Vertex AI), then
-point it at a Wren project:
-
 ```shell
-export GOOGLE_API_KEY=...
-export WREN_PROJECT_HOME=/path/to/your/wren-project
-
+cp .env.example .env      # fill in ANTHROPIC_API_KEY and WREN_PROJECT_HOME
 ./gradlew :app:bootRun
 ```
 
 Open <http://localhost:8080>.
 
+`.env` is read at startup by [spring-dotenv](https://github.com/paulschwarz/spring-dotenv)
+and is gitignored, so keys never reach a config file or the shell history.
+
 `WREN_PROJECT_HOME` must contain a built Wren project — `wren_project.yml`,
 `models/`, and `target/mdl.json` from `wren context build`. Warehouse
 credentials are resolved by the `wren` CLI from its own profile.
+
+## LLM providers
+
+ADK Java ships Claude support in **core** — `com.anthropic:anthropic-java` and
+`anthropic-java-vertex` are compile-scope dependencies, not optional extras. So
+Anthropic needs no additional wiring.
+
+| `provider` | Backend | Key | Default model |
+|---|---|---|---|
+| `ANTHROPIC` | `com.google.adk.models.Claude` | `ANTHROPIC_API_KEY` | `claude-sonnet-4-5` |
+| `GEMINI` | `com.google.adk.models.Gemini` | `GOOGLE_API_KEY` | `gemini-2.0-flash` |
+
+Both accept a `base-url` / custom client, so a gateway speaking the Anthropic
+API works. For anything else — OpenAI, vLLM, Ollama, LiteLLM — declare your own
+`BaseLlm` bean; ADK core also ships `ChatCompletionsClient` for
+OpenAI-compatible endpoints, and `contrib/spring-ai` and `contrib/langchain4j`
+bridge further providers.
+
+> One asymmetry worth knowing: **`Gemini` validates credentials when it is
+> constructed**, so a missing key throws at startup. `Claude` does not — it
+> fails at first use instead.
 
 ## Configuration
 
 ```yaml
 wren:
   adk:
-    model: gemini-2.0-flash      # any model ADK supports
+    provider: ANTHROPIC          # or GEMINI
+    model: ""                    # blank = the provider's default
     agent-name: wren_analyst
     read-only: true              # withhold Wren's store_query write tool
     transpile-only: false        # true = plan SQL but never touch the warehouse
     instruction: ""              # blank keeps the built-in analytics prompt
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY:}   # blank = read from the environment
+      base-url: ""                     # route through a gateway
+      max-tokens: 8192
+    gemini:
+      api-key: ${GOOGLE_API_KEY:}
     mcp:
       transport: STDIO           # or STREAMABLE_HTTP
       command: wren              # STDIO: spawned as a child process
@@ -66,8 +92,8 @@ wren:
       timeout: 60s
 ```
 
-Every bean is `@ConditionalOnMissingBean`, so declaring your own `LlmAgent`,
-`BaseSessionService` or `McpToolset` replaces the default. Set
+Every bean is `@ConditionalOnMissingBean`, so declaring your own `BaseLlm`,
+`LlmAgent`, `BaseSessionService` or `McpToolset` replaces the default. Set
 `wren.adk.enabled=false` to switch the whole thing off.
 
 ### Transport
@@ -132,6 +158,7 @@ fixture, and Wren serving MCP over HTTP against it.
 | `EshopFixtureTest` | Row counts, order totals reconcile to line items, no orphaned FKs, status enum |
 | `WrenMcpIntegrationTest` | Wren exposes its tool surface; `store_query` stays hidden when read-only |
 | `WrenAdkAutoConfigurationTest` | The starter wires a toolset, agent and runner that resolve against live Wren |
+| `WrenLlmProviderTest` | `provider` selects the right `BaseLlm`; per-provider default models |
 
 The fixture (`app/src/test/resources/db/eshop.sql`, 1,120 rows across 8 tables)
 is a referentially-intact subset of the WrenAI demo dataset. **It is synthetic —

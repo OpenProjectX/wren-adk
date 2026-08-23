@@ -1,6 +1,7 @@
 package org.openprojectx.wren.adk
 
 import com.google.adk.agents.LlmAgent
+import com.google.adk.models.BaseLlm
 import com.google.adk.tools.BaseToolset
 
 /** Default system instruction for an analytics agent backed by Wren. */
@@ -36,7 +37,7 @@ Answering:
 object WrenAgents {
 
     /**
-     * @param model the LLM to drive the agent, e.g. `gemini-2.0-flash`
+     * @param llm the model instance from [WrenLlms.create] — Gemini, Claude, or your own [BaseLlm]
      * @param toolset the Wren MCP toolset from [WrenToolsets.create]
      * @param name agent name, surfaced in ADK events and traces
      * @param description short description for multi-agent routing
@@ -45,7 +46,7 @@ object WrenAgents {
     @JvmStatic
     @JvmOverloads
     fun analyticsAgent(
-        model: String,
+        llm: BaseLlm,
         toolset: BaseToolset,
         name: String = "wren_analyst",
         description: String = "Answers business questions over a governed Wren semantic layer.",
@@ -54,8 +55,22 @@ object WrenAgents {
         LlmAgent.builder()
             .name(name)
             .description(description)
-            .model(model)
+            .model(llm)
             .instruction(instruction.trimIndent())
             .tools(listOf(toolset))
             .build()
+
+    /** Convenience overload resolving a Gemini model by name through ADK's registry. */
+    @JvmStatic
+    @JvmOverloads
+    fun analyticsAgent(
+        model: String,
+        toolset: BaseToolset,
+        name: String = "wren_analyst",
+        description: String = "Answers business questions over a governed Wren semantic layer.",
+        instruction: String = DEFAULT_WREN_INSTRUCTION,
+    ): LlmAgent = analyticsAgent(
+        WrenLlms.create(WrenLlmProvider.GEMINI, model),
+        toolset, name, description, instruction,
+    )
 }

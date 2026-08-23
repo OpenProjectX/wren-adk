@@ -12,6 +12,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 
+    // Reads a .env file at startup and exposes it to the Spring Environment,
+    // so ANTHROPIC_API_KEY et al. resolve without exporting them by hand.
+    implementation(libs.springDotenv)
+
     testImplementation(kotlin("test"))
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
