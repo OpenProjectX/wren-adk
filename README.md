@@ -24,7 +24,7 @@ ADK Dev UI ───┘              │
 
 | Module | Artifact | Purpose |
 |---|---|---|
-| `core` | `core` | `WrenToolsets`, `WrenAgents`, `WrenMcpSettings` — no Spring |
+| `core` | `core` | Wren MCP tools, agent factory and validated `render_a2ui` tool — no Spring |
 | `autoconfigure` | `wren-adk-spring-boot-autoconfigure` | `@AutoConfiguration`, `wren.adk.*` properties |
 | `starter` | `wren-adk-spring-boot-starter` | Dependency aggregator |
 | `app` | — | ADK Dev UI host, Jib image, integration tests |
@@ -52,6 +52,20 @@ bun run dev
 Then open <http://localhost:5173>. Vite proxies the ADK API to the Spring app,
 while `@a2ui/react` renders interactive v0.9/v0.9.1 surfaces. See
 [`ui/README.md`](ui/README.md) for production configuration.
+
+### Structured A2UI responses
+
+`wren_analyst` exposes `render_a2ui` to the LLM alongside the Wren MCP tools.
+The agent first obtains facts from Wren, then can submit a complete A2UI message
+batch to that tool. The server validates the surface lifecycle, basic catalog,
+component allowlist, event-only actions and payload limits before returning the
+messages in the ADK function response. The React client extracts that response,
+runs the official catalog validation, and renders it with `A2uiSurface`.
+
+This is intentionally a bounded presentation tool, not a data-access tool. It
+does not execute SQL, fetch URLs, render arbitrary HTML, or permit client-side
+function calls. Interactive event actions are sent back to the agent as a new
+conversation turn.
 
 > **Development only.** Google documents ADK's Dev UI as a development and
 > debugging tool, not a production frontend. Put it behind appropriate network

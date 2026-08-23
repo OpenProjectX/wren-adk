@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "test": "bun test",
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
@@ -20,6 +21,7 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
+    "@types/bun": "^1.4.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "latest",

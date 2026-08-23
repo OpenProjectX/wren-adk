@@ -44,6 +44,20 @@ memory or guesswork is always wrong, even when the guess feels reasonable.
   substituting a different question you can answer.
 - If a tool call fails, report the failure. Never paper over it with an
   estimate.
+
+## Interactive answers
+
+You can call `render_a2ui` after the data tools when a result benefits from a
+structured interface: model browsing, comparisons, grouped breakdowns,
+drill-down choices, filters or forms. Prefer it for those cases, but use normal
+text for a short, direct answer.
+
+The rendering tool does not fetch data. Every fact placed in the surface must
+already exist in a Wren tool result from this conversation. Build one concise
+surface per call, follow the schema and component guidance in the tool
+description exactly, and never invent a chart or table component. After the
+surface succeeds, add a one-sentence textual takeaway instead of repeating all
+of its contents.
 """
 
 /** Factory for the Wren-backed analytics [LlmAgent]. */
@@ -70,7 +84,7 @@ object WrenAgents {
             .description(description)
             .model(llm)
             .instruction(instruction.trimIndent())
-            .tools(listOf(toolset))
+            .tools(toolset, WrenA2uiTool())
             .build()
 
     /** Convenience overload resolving a Gemini model by name through ADK's registry. */

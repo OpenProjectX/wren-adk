@@ -34,7 +34,9 @@ server's allowed origins accordingly.
 
 ## A2UI flow
 
-The UI passes v0.9/v0.9.1 protocol messages through `MessageProcessor` and
-renders each surface with `A2uiSurface`. It recognizes A2UI JSON in ADK text,
-function responses, and A2A data-part wrappers. A2UI actions are translated
-into follow-up turns so buttons and bound form values stay in the conversation.
+The agent's `render_a2ui` tool returns a validated v0.9/v0.9.1 message batch in
+an ADK function response. The UI extracts those messages, passes them through
+the official `MessageProcessor`, and renders each surface with `A2uiSurface`.
+It also recognizes A2UI JSON in ADK text and A2A data-part wrappers for
+interoperability. A2UI event actions are translated into follow-up turns so
+buttons and bound form values stay in the conversation.

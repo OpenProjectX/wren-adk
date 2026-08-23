@@ -54,6 +54,8 @@ class WrenAdkAutoConfigurationTest {
     fun `the agent is configured and carries the wren toolset`() {
         assertEquals("wren_analyst", agent.name())
         assertTrue(agent.toolsets().isNotEmpty(), "agent should own the Wren toolset")
+        val names = agent.tools().blockingGet().map { it.name() }
+        assertTrue("render_a2ui" in names, "agent should expose render_a2ui among $names")
     }
 
     @Test
