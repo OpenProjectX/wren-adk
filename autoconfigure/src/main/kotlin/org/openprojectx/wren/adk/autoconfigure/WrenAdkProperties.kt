@@ -54,12 +54,23 @@ data class WrenAdkProperties(
      * `ANTHROPIC_API_KEY` from the environment — which is what `.env` supplies.
      */
     data class Anthropic(
+        /** Sent as `x-api-key`. What api.anthropic.com expects. */
         val apiKey: String = "",
-        /** Override to route through a gateway that speaks the Anthropic API. */
+        /**
+         * Sent as `Authorization: Bearer …`. What most Anthropic-compatible
+         * gateways expect. Takes precedence over [apiKey] when both are set.
+         */
+        val authToken: String = "",
+        /** Point at a gateway that speaks the Anthropic API. */
         val baseUrl: String = "",
         val maxTokens: Int = 8192,
         val timeout: Duration = Duration.ofMinutes(2),
         val maxRetries: Int = 2,
+        /**
+         * Send `thinking: {type: "disabled"}`. ADK cannot parse `thinking`
+         * response blocks, and several compatible gateways emit them.
+         */
+        val disableThinking: Boolean = true,
     )
 
     /** How to reach the Wren MCP server. */

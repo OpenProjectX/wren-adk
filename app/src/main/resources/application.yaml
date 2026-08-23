@@ -10,22 +10,30 @@ server:
 
 wren:
   adk:
-    # GEMINI (needs GOOGLE_API_KEY) or ANTHROPIC (needs ANTHROPIC_API_KEY).
-    # Both keys are read from .env by spring-dotenv — see .env.example.
-    provider: ${WREN_ADK_PROVIDER:ANTHROPIC}
+    # ANTHROPIC or GEMINI. LLM_PROVIDER is honoured so one .env can drive
+    # several tools; binding is case-insensitive, so `anthropic` works.
+    provider: ${WREN_ADK_PROVIDER:${LLM_PROVIDER:ANTHROPIC}}
     # Blank picks the provider's default: claude-sonnet-4-5 / gemini-2.0-flash.
-    model: ${WREN_ADK_MODEL:}
+    # ANTHROPIC_MODEL is the conventional name for Anthropic-compatible setups.
+    model: ${WREN_ADK_MODEL:${ANTHROPIC_MODEL:}}
     agent-name: wren_analyst
     app-name: wren-adk
     # Withhold Wren's store_query write tool. Flip only if the agent should
     # persist confirmed NL->SQL pairs back into the project.
     read-only: true
     anthropic:
-      # Left blank on purpose: the SDK then reads ANTHROPIC_API_KEY from the
-      # environment, so the key never has to appear in a config file.
+      # x-api-key — what api.anthropic.com expects.
       api-key: ${ANTHROPIC_API_KEY:}
+      # Authorization: Bearer … — what most compatible gateways expect.
+      # Wins over api-key when both are present.
+      auth-token: ${ANTHROPIC_AUTH_TOKEN:}
+      # Point at a gateway speaking the Anthropic API (Aliyun MaaS, an internal
+      # router, …). Blank means api.anthropic.com.
       base-url: ${ANTHROPIC_BASE_URL:}
       max-tokens: 8192
+      # ADK cannot parse `thinking` response blocks; several compatible
+      # gateways emit them. Leave on unless your endpoint never does.
+      disable-thinking: ${ANTHROPIC_DISABLE_THINKING:true}
     gemini:
       api-key: ${GOOGLE_API_KEY:}
     mcp:

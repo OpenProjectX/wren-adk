@@ -28,18 +28,34 @@ data class WrenGeminiSettings(
 )
 
 /**
- * Settings for the Anthropic provider.
+ * Settings for the Anthropic provider, and for any endpoint that speaks the
+ * Anthropic API.
  *
- * Leave [apiKey] blank to let the SDK read `ANTHROPIC_API_KEY` from the
- * environment — which is what `.env` feeds. Set [baseUrl] to route through a
- * gateway or proxy that speaks the Anthropic API.
+ * Two auth styles are supported, because compatible gateways differ:
+ * - [apiKey] sends `x-api-key`, which is what api.anthropic.com expects.
+ * - [authToken] sends `Authorization: Bearer …`, which most Anthropic-compatible
+ *   gateways expect (Aliyun MaaS, Bedrock-style proxies, internal routers).
+ *
+ * Set [baseUrl] to point at such a gateway. Leave all three blank to let the
+ * SDK read `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_BASE_URL`
+ * from the environment — which is what `.env` feeds.
  */
 data class WrenAnthropicSettings(
     val apiKey: String = "",
+    val authToken: String = "",
     val baseUrl: String = "",
     val maxTokens: Int = 8192,
     val timeout: Duration = Duration.ofMinutes(2),
     val maxRetries: Int = 2,
+    /**
+     * Send `thinking: {type: "disabled"}` on every request.
+     *
+     * ADK's `Claude` cannot parse `thinking` response blocks — it throws
+     * `UnsupportedOperationException` — and several compatible gateways emit
+     * them by default. Leave this on unless your endpoint never does.
+     * See [ThinkingDisabledClient].
+     */
+    val disableThinking: Boolean = true,
 )
 
 /** Builds the [BaseLlm] the agent runs on. */
@@ -64,18 +80,31 @@ object WrenLlms {
             .apply { if (gemini.apiKey.isNotBlank()) apiKey(gemini.apiKey) }
             .build()
 
-        WrenLlmProvider.ANTHROPIC -> Claude(model, anthropicClient(anthropic), anthropic.maxTokens)
+        WrenLlmProvider.ANTHROPIC -> {
+            val client = anthropicClient(anthropic).let {
+                if (anthropic.disableThinking) ThinkingDisabledClient.wrap(it) else it
+            }
+            Claude(model, client, anthropic.maxTokens)
+        }
     }
 
     private fun anthropicClient(settings: WrenAnthropicSettings) =
-        if (settings.apiKey.isBlank() && settings.baseUrl.isBlank()) {
-            // Reads ANTHROPIC_API_KEY (and ANTHROPIC_BASE_URL) from the environment.
+        if (settings.apiKey.isBlank() && settings.authToken.isBlank() && settings.baseUrl.isBlank()) {
+            // Reads ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN / ANTHROPIC_BASE_URL
+            // from the environment.
             AnthropicOkHttpClient.fromEnv()
         } else {
             AnthropicOkHttpClient.builder()
                 .apply {
-                    if (settings.apiKey.isNotBlank()) apiKey(settings.apiKey)
                     if (settings.baseUrl.isNotBlank()) baseUrl(settings.baseUrl)
+                    // The SDK requires one credential. Prefer the bearer token
+                    // when both are present: a gateway that issues one usually
+                    // ignores x-api-key entirely.
+                    when {
+                        settings.authToken.isNotBlank() -> authToken(settings.authToken)
+                        settings.apiKey.isNotBlank() -> apiKey(settings.apiKey)
+                        else -> apiKey(System.getenv("ANTHROPIC_API_KEY").orEmpty())
+                    }
                 }
                 .timeout(settings.timeout)
                 .maxRetries(settings.maxRetries)

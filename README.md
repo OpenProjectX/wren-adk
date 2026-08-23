@@ -54,8 +54,33 @@ Anthropic needs no additional wiring.
 | `ANTHROPIC` | `com.google.adk.models.Claude` | `ANTHROPIC_API_KEY` | `claude-sonnet-4-5` |
 | `GEMINI` | `com.google.adk.models.Gemini` | `GOOGLE_API_KEY` | `gemini-2.0-flash` |
 
-Both accept a `base-url` / custom client, so a gateway speaking the Anthropic
-API works. For anything else — OpenAI, vLLM, Ollama, LiteLLM — declare your own
+### Anthropic-compatible endpoints
+
+Any endpoint speaking the Anthropic API works — Aliyun MaaS, an internal
+router, a Bedrock-style proxy — including ones serving non-Claude models.
+
+```ini
+LLM_PROVIDER=anthropic
+ANTHROPIC_BASE_URL=https://…/apps/anthropic
+ANTHROPIC_AUTH_TOKEN=…          # Authorization: Bearer  (most gateways)
+# ANTHROPIC_API_KEY=…           # x-api-key              (api.anthropic.com)
+ANTHROPIC_MODEL=qwen3.8-max
+```
+
+Both auth styles are supported; the bearer token wins when both are set,
+because a gateway that issues one usually ignores `x-api-key`.
+
+> **Thinking blocks.** ADK's `Claude` converts only `text` and `tool_use`
+> response blocks — anything else throws `UnsupportedOperationException`
+> (`Claude.anthropicContentBlockToPart`). Several gateways emit a `thinking`
+> block ahead of the text, which breaks every call. Those methods are private,
+> so this starter fixes it on the request side instead:
+> `anthropic.disable-thinking` (**on by default**) sends
+> `thinking: {type: "disabled"}` via a dynamic proxy around the client
+> (`ThinkingDisabledClient`). Set it to `false` if your endpoint never emits
+> thinking blocks — and drop it entirely once ADK handles them.
+
+For anything else — OpenAI, vLLM, Ollama, LiteLLM — declare your own
 `BaseLlm` bean; ADK core also ships `ChatCompletionsClient` for
 OpenAI-compatible endpoints, and `contrib/spring-ai` and `contrib/langchain4j`
 bridge further providers.
@@ -76,9 +101,11 @@ wren:
     transpile-only: false        # true = plan SQL but never touch the warehouse
     instruction: ""              # blank keeps the built-in analytics prompt
     anthropic:
-      api-key: ${ANTHROPIC_API_KEY:}   # blank = read from the environment
-      base-url: ""                     # route through a gateway
+      api-key: ${ANTHROPIC_API_KEY:}       # x-api-key
+      auth-token: ${ANTHROPIC_AUTH_TOKEN:} # Authorization: Bearer (wins)
+      base-url: ${ANTHROPIC_BASE_URL:}     # blank = api.anthropic.com
       max-tokens: 8192
+      disable-thinking: true               # see the note above
     gemini:
       api-key: ${GOOGLE_API_KEY:}
     mcp:
@@ -159,6 +186,7 @@ fixture, and Wren serving MCP over HTTP against it.
 | `WrenMcpIntegrationTest` | Wren exposes its tool surface; `store_query` stays hidden when read-only |
 | `WrenAdkAutoConfigurationTest` | The starter wires a toolset, agent and runner that resolve against live Wren |
 | `WrenLlmProviderTest` | `provider` selects the right `BaseLlm`; per-provider default models |
+| `AnthropicCompatibleLiveTest` | Live call against the configured endpoint — **skipped unless `ANTHROPIC_BASE_URL` is set**, so the default suite stays offline and free |
 
 The fixture (`app/src/test/resources/db/eshop.sql`, 1,120 rows across 8 tables)
 is a referentially-intact subset of the WrenAI demo dataset. **It is synthetic —

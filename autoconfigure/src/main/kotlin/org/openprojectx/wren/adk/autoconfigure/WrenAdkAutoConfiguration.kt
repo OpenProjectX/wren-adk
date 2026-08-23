@@ -68,10 +68,12 @@ class WrenAdkAutoConfiguration {
         model = properties.resolvedModel(),
         anthropic = WrenAnthropicSettings(
             apiKey = properties.anthropic.apiKey,
+            authToken = properties.anthropic.authToken,
             baseUrl = properties.anthropic.baseUrl,
             maxTokens = properties.anthropic.maxTokens,
             timeout = properties.anthropic.timeout,
             maxRetries = properties.anthropic.maxRetries,
+            disableThinking = properties.anthropic.disableThinking,
         ),
         gemini = WrenGeminiSettings(apiKey = properties.gemini.apiKey),
     )
