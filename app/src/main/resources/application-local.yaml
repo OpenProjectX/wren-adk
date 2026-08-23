@@ -1,0 +1,59 @@
+# Ready-to-run local profile.
+#
+#   ./gradlew :app:bootRun --args='--spring.profiles.active=local'
+#
+# Assumes:
+#   - the `wren` CLI is installed (pip install wrenai) — absolute path below,
+#     because the JVM does not inherit a login shell's PATH
+#   - a built Wren project at wren.adk.mcp.project-home (models/, target/mdl.json)
+#   - a connection profile bound to it (`wren context set-profile <name>`), so
+#     warehouse credentials come from ~/.wren/profiles.yml, not from here
+#   - .env supplies the LLM credentials (see .env.example)
+#
+# Everything below can be overridden by an environment variable of the same
+# name, so this file holds paths and preferences — never secrets.
+
+server:
+  port: ${PORT:8080}
+
+adk:
+  agents:
+    loader: static
+
+wren:
+  adk:
+    provider: ${env.LLM_PROVIDER:${LLM_PROVIDER:ANTHROPIC}}
+    model: ${WREN_ADK_MODEL:${env.ANTHROPIC_MODEL:${ANTHROPIC_MODEL:}}}
+    agent-name: wren_analyst
+
+    # Read-only: the store_query write tool stays hidden, so a local session
+    # cannot write NL->SQL pairs back into the project by accident.
+    read-only: true
+
+    anthropic:
+      api-key: ${env.ANTHROPIC_API_KEY:${ANTHROPIC_API_KEY:}}
+      auth-token: ${env.ANTHROPIC_AUTH_TOKEN:${ANTHROPIC_AUTH_TOKEN:}}
+      base-url: ${env.ANTHROPIC_BASE_URL:${ANTHROPIC_BASE_URL:}}
+      max-tokens: 8192
+      # Compatible gateways often return `thinking` blocks, which ADK cannot
+      # parse. Leave on unless your endpoint never emits them.
+      disable-thinking: true
+
+    skills:
+      enabled: true
+      names: [usage]
+      command: ${env.WREN_CLI:${WREN_CLI:/home/coder/.local/bin/wren}}
+
+    mcp:
+      # Spawns the CLI as a child process — no port, nothing on the network,
+      # and the process dies with the Spring context.
+      transport: STDIO
+      command: ${env.WREN_CLI:${WREN_CLI:/home/coder/.local/bin/wren}}
+      args: [serve, mcp]
+      project-home: ${env.WREN_PROJECT_HOME:${WREN_PROJECT_HOME:/data/Git/WrenAI-demo}}
+
+logging:
+  level:
+    org.openprojectx.wren.adk: DEBUG
+    # Uncomment to see every MCP frame:
+    # io.modelcontextprotocol: DEBUG

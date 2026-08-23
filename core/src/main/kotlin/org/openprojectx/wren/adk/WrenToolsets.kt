@@ -3,6 +3,7 @@ package org.openprojectx.wren.adk
 import com.google.adk.tools.mcp.McpToolset
 import com.google.adk.tools.mcp.StdioServerParameters
 import com.google.adk.tools.mcp.StreamableHttpServerParameters
+import java.io.File
 
 /**
  * Builds the [McpToolset] that exposes Wren's semantic layer to an ADK agent.
@@ -37,7 +38,15 @@ object WrenToolsets {
         transpileOnly: Boolean,
     ): McpToolset {
         val env = buildMap {
-            putAll(settings.env)
+            // The CLI resolves ${'$'}{VAR} placeholders in its connection profile from
+            // the environment and from a .env it discovers relative to its
+            // *working directory* — which is this JVM's, not the project's.
+            // ADK's stdio parameters expose no working directory, so the
+            // project's own .env is read here and passed through. Without this
+            // the child dies with "Profile references ${'$'}{POSTGRES_HOST} but it is
+            // not set in the environment or any discovered .env file."
+            settings.projectHome?.let { putAll(readDotEnv(File(it, ".env"))) }
+            putAll(settings.env) // explicit settings always win
             settings.projectHome?.let { put("WREN_PROJECT_HOME", it) }
         }
         val params = StdioServerParameters.builder()
@@ -46,6 +55,20 @@ object WrenToolsets {
             .env(env)
             .build()
         return McpToolset(params.toServerParameters())
+    }
+
+    /** Best-effort .env read; an unreadable or absent file is not an error. */
+    private fun readDotEnv(file: File): Map<String, String> = try {
+        if (!file.isFile) {
+            emptyMap()
+        } else {
+            file.readLines()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() && !it.startsWith("#") && "=" in it }
+                .associate { it.substringBefore("=").trim() to it.substringAfter("=").trim() }
+        }
+    } catch (_: Exception) {
+        emptyMap()
     }
 
     private fun http(settings: WrenMcpSettings): McpToolset {

@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
  * The full loop: the model calls Wren's MCP tools, Wren queries Postgres
  * through the semantic layer, and the model answers from the result.
  *
- * This is the path the chat UI drives, and the only one that proves tool
+ * This is the path the ADK Dev UI drives, and the only one that proves tool
  * calling survives an Anthropic-compatible gateway — `tool_use` blocks are
  * where a compatible endpoint is most likely to diverge from the real API.
  *

@@ -8,14 +8,20 @@ spring:
 server:
   port: 8080
 
+adk:
+  agents:
+    # The Wren agent is constructed by Spring and registered through an
+    # AgentStaticLoader; do not scan the filesystem for ROOT_AGENT fields.
+    loader: static
+
 wren:
   adk:
     # ANTHROPIC or GEMINI. LLM_PROVIDER is honoured so one .env can drive
     # several tools; binding is case-insensitive, so `anthropic` works.
-    provider: ${WREN_ADK_PROVIDER:${LLM_PROVIDER:ANTHROPIC}}
+    provider: ${WREN_ADK_PROVIDER:${env.LLM_PROVIDER:${LLM_PROVIDER:ANTHROPIC}}}
     # Blank picks the provider's default: claude-sonnet-4-5 / gemini-2.0-flash.
     # ANTHROPIC_MODEL is the conventional name for Anthropic-compatible setups.
-    model: ${WREN_ADK_MODEL:${ANTHROPIC_MODEL:}}
+    model: ${WREN_ADK_MODEL:${env.ANTHROPIC_MODEL:${ANTHROPIC_MODEL:}}}
     agent-name: wren_analyst
     app-name: wren-adk
     # Withhold Wren's store_query write tool. Flip only if the agent should
@@ -23,26 +29,26 @@ wren:
     read-only: true
     anthropic:
       # x-api-key — what api.anthropic.com expects.
-      api-key: ${ANTHROPIC_API_KEY:}
+      api-key: ${env.ANTHROPIC_API_KEY:${ANTHROPIC_API_KEY:}}
       # Authorization: Bearer … — what most compatible gateways expect.
       # Wins over api-key when both are present.
-      auth-token: ${ANTHROPIC_AUTH_TOKEN:}
+      auth-token: ${env.ANTHROPIC_AUTH_TOKEN:${ANTHROPIC_AUTH_TOKEN:}}
       # Point at a gateway speaking the Anthropic API (Aliyun MaaS, an internal
       # router, …). Blank means api.anthropic.com.
-      base-url: ${ANTHROPIC_BASE_URL:}
+      base-url: ${env.ANTHROPIC_BASE_URL:${ANTHROPIC_BASE_URL:}}
       max-tokens: 8192
       # ADK cannot parse `thinking` response blocks; several compatible
       # gateways emit them. Leave on unless your endpoint never does.
-      disable-thinking: ${ANTHROPIC_DISABLE_THINKING:true}
+      disable-thinking: ${env.ANTHROPIC_DISABLE_THINKING:${ANTHROPIC_DISABLE_THINKING:true}}
     gemini:
-      api-key: ${GOOGLE_API_KEY:}
+      api-key: ${env.GOOGLE_API_KEY:${GOOGLE_API_KEY:}}
     mcp:
       # STDIO spawns `wren serve mcp` as a child process. The wrenai base image
       # puts the CLI on PATH, so nothing extra is needed and nothing listens on
       # the network. Switch to STREAMABLE_HTTP to talk to a sidecar or service.
-      transport: ${WREN_ADK_TRANSPORT:STDIO}
-      project-home: ${WREN_PROJECT_HOME:/project}
-      url: ${WREN_MCP_URL:http://127.0.0.1:8080/mcp}
+      transport: ${env.WREN_ADK_TRANSPORT:${WREN_ADK_TRANSPORT:STDIO}}
+      project-home: ${env.WREN_PROJECT_HOME:${WREN_PROJECT_HOME:/project}}
+      url: ${env.WREN_MCP_URL:${WREN_MCP_URL:http://127.0.0.1:8080/mcp}}
 
 logging:
   level:

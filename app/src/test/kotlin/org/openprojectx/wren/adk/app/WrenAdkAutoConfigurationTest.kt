@@ -3,11 +3,18 @@ package org.openprojectx.wren.adk.app
 import com.google.adk.agents.LlmAgent
 import com.google.adk.runner.Runner
 import com.google.adk.tools.mcp.McpToolset
+import com.google.adk.web.AgentLoader
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.http.HttpStatus
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -34,6 +41,8 @@ class WrenAdkAutoConfigurationTest {
     @Autowired lateinit var toolset: McpToolset
     @Autowired lateinit var agent: LlmAgent
     @Autowired lateinit var runner: Runner
+    @Autowired lateinit var agentLoader: AgentLoader
+    @LocalServerPort var port: Int = 0
 
     @Test
     fun `the toolset bean resolves wren's tools`() {
@@ -50,5 +59,28 @@ class WrenAdkAutoConfigurationTest {
     @Test
     fun `a runner is available for chat turns`() {
         assertEquals("wren-adk", runner.appName())
+    }
+
+    @Test
+    fun `the ADK Dev UI can discover the wren agent`() {
+        assertEquals(listOf("wren_analyst"), agentLoader.listAgents())
+        assertEquals(agent, agentLoader.loadAgent("wren_analyst"))
+    }
+
+    @Test
+    fun `the ADK Dev UI and agent registry are served`() {
+        val client = HttpClient.newHttpClient()
+        fun get(path: String): HttpResponse<String> = client.send(
+            HttpRequest.newBuilder(URI("http://localhost:$port$path")).GET().build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+
+        val apps = get("/list-apps")
+        assertEquals(HttpStatus.OK.value(), apps.statusCode())
+        assertEquals("[\"wren_analyst\"]", apps.body())
+
+        val devUi = get("/dev-ui")
+        assertEquals(HttpStatus.OK.value(), devUi.statusCode())
+        assertTrue(devUi.body().contains("<title>Agent Development Kit Dev UI</title>"))
     }
 }

@@ -2,8 +2,8 @@
 
 A Spring Boot starter that gives a [Google ADK](https://github.com/google/adk-java)
 agent governed access to a warehouse through the
-[Wren](https://github.com/Canner/WrenAI) semantic layer — plus a chat web app
-that demonstrates it.
+[Wren](https://github.com/Canner/WrenAI) semantic layer — plus Google ADK's
+built-in Dev UI for exercising it.
 
 The agent writes SQL against **model names**. Wren expands each model into a
 CTE, resolves the real schema, prunes columns and translates dialect, so the
@@ -11,7 +11,7 @@ model never has to know the physical table layout — and cannot query anything
 outside the MDL.
 
 ```
-browser ──SSE──▶ Spring Boot app ──ADK──▶ LLM
+ADK Dev UI ──SSE──▶ Spring Boot app ──ADK──▶ LLM
                        │
                        │ MCP (stdio or streamable HTTP)
                        ▼
@@ -25,7 +25,7 @@ browser ──SSE──▶ Spring Boot app ──ADK──▶ LLM
 | `core` | `core` | `WrenToolsets`, `WrenAgents`, `WrenMcpSettings` — no Spring |
 | `autoconfigure` | `wren-adk-spring-boot-autoconfigure` | `@AutoConfiguration`, `wren.adk.*` properties |
 | `starter` | `wren-adk-spring-boot-starter` | Dependency aggregator |
-| `app` | — | Chat UI, SSE controller, Jib image, integration tests |
+| `app` | — | ADK Dev UI host, Jib image, integration tests |
 
 ## Quick start
 
@@ -34,7 +34,13 @@ cp .env.example .env      # fill in ANTHROPIC_API_KEY and WREN_PROJECT_HOME
 ./gradlew :app:bootRun
 ```
 
-Open <http://localhost:8080>.
+Open <http://localhost:8080/dev-ui>. The application registers the
+Spring-created `wren_analyst` with ADK's `AgentStaticLoader`; ADK supplies the
+browser assets, session API, SSE execution endpoint, traces, and evaluation UI.
+
+> **Development only.** Google documents ADK's Dev UI as a development and
+> debugging tool, not a production frontend. Put it behind appropriate network
+> controls and replace it with an authenticated application UI for production.
 
 `.env` is read at startup by [spring-dotenv](https://github.com/paulschwarz/spring-dotenv)
 and is gitignored, so keys never reach a config file or the shell history.
@@ -211,7 +217,7 @@ variables were absent, and the live tests appear to "skip" forever.
 |---|---|
 | `EshopFixtureTest` | Row counts, order totals reconcile to line items, no orphaned FKs, status enum |
 | `WrenMcpIntegrationTest` | Wren exposes its tool surface; `store_query` stays hidden when read-only |
-| `WrenAdkAutoConfigurationTest` | The starter wires a toolset, agent and runner that resolve against live Wren |
+| `WrenAdkAutoConfigurationTest` | The starter wires a toolset, agent and runner, and the ADK Dev UI loader discovers the agent |
 | `WrenLlmProviderTest` | `provider` selects the right `BaseLlm`; per-provider default models |
 | `WrenSkillsTest` | Guide loading, front-matter stripping, and quiet degradation when the CLI is absent |
 | `AnthropicCompatibleLiveTest` | Live call against the configured endpoint — **skipped unless `ANTHROPIC_BASE_URL` is set** |

@@ -242,7 +242,7 @@ Content-Type: application/json
 
 
 ### 7. Streaming
-# The app streams turns to the browser; this shows the raw SSE the SDK consumes.
+# Shows the raw streaming response the ADK model client consumes.
 POST {{ANTHROPIC_BASE_URL}}/v1/messages
 Authorization: Bearer {{ANTHROPIC_AUTH_TOKEN}}
 anthropic-version: {{ANTHROPIC_VERSION}}
@@ -347,47 +347,50 @@ mcp-session-id: {{MCP_SESSION}}
 }
 
 
-### 12. App — health
-# Confirms which provider, model and transport the running app resolved.
-GET {{APP_BASE_URL}}/api/chat/health
+### 12. ADK Dev UI — list registered agents
+GET {{APP_BASE_URL}}/list-apps
 Accept: application/json
 
 > {%
-    client.test("app is up", function () {
+    client.test("wren agent is registered", function () {
         client.assert(response.status === 200, "HTTP " + response.status);
+        client.assert(response.body.includes("wren_analyst"),
+            "expected wren_analyst in " + JSON.stringify(response.body));
     });
-    if (response.status === 200) {
-        client.log("agent: " + response.body.agent +
-                   " | model: " + response.body.model +
-                   " | transport: " + response.body.transport +
-                   " | readOnly: " + response.body.readOnly);
-    }
 %}
 
 
-### 13. App — new chat session
-POST {{APP_BASE_URL}}/api/chat/session
+### 13. ADK Dev UI — new chat session
+POST {{APP_BASE_URL}}/apps/wren_analyst/users/http-client/sessions
+Content-Type: application/json
 Accept: application/json
 
+{
+  "state": {}
+}
+
 > {%
-    client.global.set("CHAT_SESSION", response.body.sessionId);
-    client.log("session: " + response.body.sessionId);
+    client.global.set("CHAT_SESSION", response.body.id);
+    client.log("session: " + response.body.id);
 %}
 
 
-### 14. App — ask a question (SSE)
+### 14. ADK Dev UI — ask a question (SSE)
 # The full loop: model -> Wren MCP tools -> Postgres -> answer.
-# The response is a Server-Sent Events stream with four event names:
-#   session  the conversation id
-#   tool     a tool the agent decided to call
-#   result   what that tool returned
-#   message  assistant text
-#   done     end of turn
-POST {{APP_BASE_URL}}/api/chat
+# The response contains ADK Event objects, the same stream consumed by Dev UI.
+POST {{APP_BASE_URL}}/run_sse
 Content-Type: application/json
 Accept: text/event-stream
 
 {
-  "message": "How many orders are in the database? Use the tools to check.",
-  "sessionId": "{{CHAT_SESSION}}"
+  "appName": "wren_analyst",
+  "userId": "http-client",
+  "sessionId": "{{CHAT_SESSION}}",
+  "newMessage": {
+    "role": "user",
+    "parts": [
+      { "text": "How many orders are in the database? Use the tools to check." }
+    ]
+  },
+  "streaming": false
 }

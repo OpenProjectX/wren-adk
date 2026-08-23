@@ -4,12 +4,12 @@ plugins {
     alias(libs.plugins.jib)
 }
 
-description = "Chat application: Google ADK agent over a Wren semantic layer"
+description = "Google ADK Dev UI for a Wren-backed analytics agent"
 
 dependencies {
     implementation(project(":wren-adk-spring-boot-starter"))
 
-    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation(libs.googleAdkDev)
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 
     // Reads a .env file at startup and exposes it to the Spring Environment,
@@ -24,6 +24,14 @@ dependencies {
     testImplementation("org.testcontainers:postgresql")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.postgresql:postgresql")
+}
+
+// spring-dotenv reads `.env` relative to the working directory, and Gradle
+// runs bootRun from the subproject dir. The file lives at the repo root, so
+// without this the app silently starts with no credentials and falls back to
+// each provider's default model.
+tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
+    workingDir = rootProject.projectDir
 }
 
 // Integration tests that hit a live LLM read their configuration from the
