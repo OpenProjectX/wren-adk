@@ -88,9 +88,25 @@ jib {
         }
     }
     to {
-        image = providers.gradleProperty("appImage")
+        image = providers.gradleProperty("jibToImage")
+            .orElse(providers.environmentVariable("JIB_TO_IMAGE"))
+            .orElse(providers.gradleProperty("appImage"))
             .getOrElse("ghcr.io/openprojectx/wren-adk-app")
         tags = setOf(version.toString(), "latest")
+
+        val username = providers.gradleProperty("jibToUsername")
+            .orElse(providers.environmentVariable("JIB_TO_USERNAME"))
+            .orNull
+        val password = providers.gradleProperty("jibToPassword")
+            .orElse(providers.environmentVariable("JIB_TO_PASSWORD"))
+            .orNull
+
+        if (!username.isNullOrBlank() && !password.isNullOrBlank()) {
+            auth {
+                this.username = username
+                this.password = password
+            }
+        }
     }
     container {
         // uid 10001 is the non-root `wren` user created by the base image.

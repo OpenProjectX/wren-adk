@@ -111,7 +111,7 @@ nexusPublishing {
 }
 
 configure<ReleaseExtension> {
-    buildTasks.set(listOf("publishToSonatype", "closeAndReleaseSonatypeStagingRepository"))
+    buildTasks.set(listOf("publishToSonatype", "closeAndReleaseSonatypeStagingRepository", ":app:jib"))
     versionPropertyFile.set("gradle.properties")
     tagTemplate.set("\$name-\$version")
 
