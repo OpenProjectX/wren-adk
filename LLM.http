@@ -1,0 +1,393 @@
+### Wren-ADK — LLM, MCP and app endpoints
+#
+# Pick an environment in the run gutter: `dev` (Aliyun MaaS / Qwen) or
+# `anthropic` (api.anthropic.com).
+#
+# Non-secret values live in http-client.env.json.
+# Secrets live in http-client.private.env.json, which is gitignored. It must
+# define, per environment:
+#
+#   ANTHROPIC_AUTH_TOKEN   Authorization: Bearer …   (most compatible gateways)
+#   ANTHROPIC_API_KEY      x-api-key                 (api.anthropic.com)
+#   OPENAI_API_KEY         Authorization: Bearer …   (OpenAI-compatible)
+#
+# Leave the ones you do not use as empty strings.
+#
+# Requests 1–7 hit the model directly, 8–11 hit Wren over MCP, 12–14 hit the
+# Spring app. Start at 1: if it fails, nothing downstream can work.
+
+
+### 1. Model access probe
+# Smallest possible call. Answers "can this token use this model at all?".
+# A 403 AccessDenied.Unpurchased here means quota/eligibility, not our code.
+POST {{ANTHROPIC_BASE_URL}}/v1/messages
+Authorization: Bearer {{ANTHROPIC_AUTH_TOKEN}}
+anthropic-version: {{ANTHROPIC_VERSION}}
+Content-Type: application/json
+
+{
+  "model": "{{ANTHROPIC_MODEL}}",
+  "max_tokens": 16,
+  "messages": [
+    { "role": "user", "content": "Reply with exactly: WREN_OK" }
+  ]
+}
+
+> {%
+    client.test("reachable", function () {
+        client.assert(response.status === 200, "HTTP " + response.status +
+            " — " + JSON.stringify(response.body));
+    });
+    if (response.status === 200) {
+        const types = response.body.content.map(b => b.type);
+        client.log("content block types: " + JSON.stringify(types));
+        client.global.set("SAW_THINKING", types.includes("thinking") ? "yes" : "no");
+    }
+%}
+
+
+### 2. Same call with x-api-key instead of a bearer token
+# Use this against api.anthropic.com, or to check which auth style a gateway
+# actually accepts. Exactly one of requests 1 and 2 should succeed.
+POST {{ANTHROPIC_BASE_URL}}/v1/messages
+x-api-key: {{ANTHROPIC_API_KEY}}
+anthropic-version: {{ANTHROPIC_VERSION}}
+Content-Type: application/json
+
+{
+  "model": "{{ANTHROPIC_MODEL}}",
+  "max_tokens": 16,
+  "messages": [
+    { "role": "user", "content": "Reply with exactly: WREN_OK" }
+  ]
+}
+
+
+### 3. Thinking ENABLED — reproduces the ADK failure
+# Some gateways (Qwen on Aliyun, for one) return a `thinking` block ahead of the
+# text. ADK's Claude model converts only `text` and `tool_use`, and throws
+#   UnsupportedOperationException: Not supported yet.
+#   at com.google.adk.models.Claude.anthropicContentBlockToPart
+# If the block list below contains "thinking", that is the bug this project
+# works around.
+POST {{ANTHROPIC_BASE_URL}}/v1/messages
+Authorization: Bearer {{ANTHROPIC_AUTH_TOKEN}}
+anthropic-version: {{ANTHROPIC_VERSION}}
+Content-Type: application/json
+
+{
+  "model": "{{ANTHROPIC_MODEL}}",
+  "max_tokens": 256,
+  "messages": [
+    { "role": "user", "content": "What is 17 * 23? Answer with the number only." }
+  ]
+}
+
+> {%
+    if (response.status === 200) {
+        const types = response.body.content.map(b => b.type);
+        client.log("block types: " + JSON.stringify(types));
+        client.test("shows whether this endpoint emits thinking blocks", function () {
+            client.assert(true, types.includes("thinking")
+                ? "emits thinking — ADK needs the workaround"
+                : "no thinking block — ADK would cope unaided");
+        });
+    }
+%}
+
+
+### 4. Thinking DISABLED — the workaround
+# This is what ThinkingDisabledClient injects into every request. The response
+# should contain only a `text` block, which ADK can parse.
+POST {{ANTHROPIC_BASE_URL}}/v1/messages
+Authorization: Bearer {{ANTHROPIC_AUTH_TOKEN}}
+anthropic-version: {{ANTHROPIC_VERSION}}
+Content-Type: application/json
+
+{
+  "model": "{{ANTHROPIC_MODEL}}",
+  "max_tokens": 256,
+  "thinking": { "type": "disabled" },
+  "messages": [
+    { "role": "user", "content": "What is 17 * 23? Answer with the number only." }
+  ]
+}
+
+> {%
+    if (response.status === 200) {
+        const types = response.body.content.map(b => b.type);
+        client.log("block types: " + JSON.stringify(types));
+        client.test("no thinking block remains", function () {
+            client.assert(!types.includes("thinking"),
+                "endpoint still returned a thinking block: " + JSON.stringify(types));
+        });
+    }
+%}
+
+
+### 5. Tool calling — does the model ask for the tool?
+# The critical path for the agent. A model that answers directly instead of
+# emitting a `tool_use` block will fabricate numbers — exactly what was observed
+# once during testing (it replied "180" for a count that is really 212).
+# stop_reason should be "tool_use".
+POST {{ANTHROPIC_BASE_URL}}/v1/messages
+Authorization: Bearer {{ANTHROPIC_AUTH_TOKEN}}
+anthropic-version: {{ANTHROPIC_VERSION}}
+Content-Type: application/json
+
+{
+  "model": "{{ANTHROPIC_MODEL}}",
+  "max_tokens": 1024,
+  "thinking": { "type": "disabled" },
+  "system": "You have no knowledge of this database. Every figure you report must come from a tool result. Never guess.",
+  "tools": [
+    {
+      "name": "run_sql",
+      "description": "Execute SQL through the Wren semantic layer. Write SQL against MODEL names, never physical tables.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "sql": { "type": "string", "description": "The SQL to run" }
+        },
+        "required": ["sql"]
+      }
+    }
+  ],
+  "messages": [
+    { "role": "user", "content": "How many orders are in the database?" }
+  ]
+}
+
+> {%
+    if (response.status === 200) {
+        const blocks = response.body.content;
+        const use = blocks.find(b => b.type === "tool_use");
+        client.log("stop_reason: " + response.body.stop_reason);
+        client.test("the model requested a tool instead of guessing", function () {
+            client.assert(use !== undefined,
+                "no tool_use block — the model answered from memory: " +
+                JSON.stringify(blocks));
+        });
+        if (use) {
+            client.global.set("TOOL_USE_ID", use.id);
+            client.global.set("TOOL_SQL", JSON.stringify(use.input));
+            client.log("tool_use id: " + use.id);
+            client.log("requested SQL: " + JSON.stringify(use.input));
+        }
+    }
+%}
+
+
+### 6. Tool result — feed the answer back and get the final reply
+# Completes the round trip started by request 5. Run 5 first: it captures
+# TOOL_USE_ID. 212 is the real row count in the test fixture.
+POST {{ANTHROPIC_BASE_URL}}/v1/messages
+Authorization: Bearer {{ANTHROPIC_AUTH_TOKEN}}
+anthropic-version: {{ANTHROPIC_VERSION}}
+Content-Type: application/json
+
+{
+  "model": "{{ANTHROPIC_MODEL}}",
+  "max_tokens": 1024,
+  "thinking": { "type": "disabled" },
+  "system": "You have no knowledge of this database. Every figure you report must come from a tool result. Never guess.",
+  "tools": [
+    {
+      "name": "run_sql",
+      "description": "Execute SQL through the Wren semantic layer.",
+      "input_schema": {
+        "type": "object",
+        "properties": { "sql": { "type": "string" } },
+        "required": ["sql"]
+      }
+    }
+  ],
+  "messages": [
+    { "role": "user", "content": "How many orders are in the database?" },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "{{TOOL_USE_ID}}",
+          "name": "run_sql",
+          "input": { "sql": "SELECT count(*) AS orders FROM orders" }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "{{TOOL_USE_ID}}",
+          "content": "{\"columns\":[\"orders\"],\"rows\":[{\"orders\":212}],\"row_count\":1}"
+        }
+      ]
+    }
+  ]
+}
+
+> {%
+    if (response.status === 200) {
+        const text = response.body.content.filter(b => b.type === "text")
+                                          .map(b => b.text).join("");
+        client.log("final answer: " + text);
+        client.test("answers from the tool result, not from memory", function () {
+            client.assert(text.includes("212"),
+                "expected 212 from the tool result, got: " + text);
+        });
+    }
+%}
+
+
+### 7. Streaming
+# The app streams turns to the browser; this shows the raw SSE the SDK consumes.
+POST {{ANTHROPIC_BASE_URL}}/v1/messages
+Authorization: Bearer {{ANTHROPIC_AUTH_TOKEN}}
+anthropic-version: {{ANTHROPIC_VERSION}}
+Content-Type: application/json
+Accept: text/event-stream
+
+{
+  "model": "{{ANTHROPIC_MODEL}}",
+  "max_tokens": 128,
+  "stream": true,
+  "thinking": { "type": "disabled" },
+  "messages": [
+    { "role": "user", "content": "Count from 1 to 5, one number per line." }
+  ]
+}
+
+
+### 8. OpenAI-compatible endpoint
+# Your .env also points at DashScope's compatible mode. ADK core ships a
+# ChatCompletionsClient for this shape, though this starter does not wire it —
+# you would declare your own BaseLlm bean.
+POST {{OPENAI_BASE_URL}}/chat/completions
+Authorization: Bearer {{OPENAI_API_KEY}}
+Content-Type: application/json
+
+{
+  "model": "{{OPENAI_MODEL}}",
+  "max_tokens": 64,
+  "messages": [
+    { "role": "user", "content": "Reply with exactly: WREN_OK" }
+  ]
+}
+
+
+### 9. Wren MCP — initialize
+# Start a server first:
+#   wren serve mcp --transport http --host 127.0.0.1 --port 8020 -q
+# Capture the session id: MCP holds session state in-process, so every later
+# call must carry it. (This is also why a multi-replica deployment needs
+# session affinity.)
+POST {{WREN_MCP_URL}}
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2025-06-18",
+    "capabilities": {},
+    "clientInfo": { "name": "http-client", "version": "1" }
+  }
+}
+
+> {%
+    const sid = response.headers.valueOf("mcp-session-id");
+    client.global.set("MCP_SESSION", sid);
+    client.log("mcp-session-id: " + sid);
+    client.test("session established", function () {
+        client.assert(sid !== null && sid !== undefined, "no session id returned");
+    });
+%}
+
+
+### 10. Wren MCP — list tools
+# Expect 17 with default flags: run_sql, dry_run, query_cube, dry_plan,
+# get_mdl, list_models, describe_model, describe_schema, get_data_source,
+# list_functions, list_cubes, describe_cube, get_instructions, get_context,
+# recall_queries, list_stored_queries, list_knowledge.
+# store_query appears only when the server was started with --allow-write.
+POST {{WREN_MCP_URL}}
+Content-Type: application/json
+Accept: application/json, text/event-stream
+mcp-session-id: {{MCP_SESSION}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/list"
+}
+
+
+### 11. Wren MCP — run a query through the semantic layer
+# Note the SQL names a MODEL, not a physical table, and no schema is qualified.
+# Wren expands it into CTEs and resolves the real location.
+POST {{WREN_MCP_URL}}
+Content-Type: application/json
+Accept: application/json, text/event-stream
+mcp-session-id: {{MCP_SESSION}}
+
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "run_sql",
+    "arguments": {
+      "sql": "SELECT status, count(*) AS orders FROM orders GROUP BY 1 ORDER BY 2 DESC"
+    }
+  }
+}
+
+
+### 12. App — health
+# Confirms which provider, model and transport the running app resolved.
+GET {{APP_BASE_URL}}/api/chat/health
+Accept: application/json
+
+> {%
+    client.test("app is up", function () {
+        client.assert(response.status === 200, "HTTP " + response.status);
+    });
+    if (response.status === 200) {
+        client.log("agent: " + response.body.agent +
+                   " | model: " + response.body.model +
+                   " | transport: " + response.body.transport +
+                   " | readOnly: " + response.body.readOnly);
+    }
+%}
+
+
+### 13. App — new chat session
+POST {{APP_BASE_URL}}/api/chat/session
+Accept: application/json
+
+> {%
+    client.global.set("CHAT_SESSION", response.body.sessionId);
+    client.log("session: " + response.body.sessionId);
+%}
+
+
+### 14. App — ask a question (SSE)
+# The full loop: model -> Wren MCP tools -> Postgres -> answer.
+# The response is a Server-Sent Events stream with four event names:
+#   session  the conversation id
+#   tool     a tool the agent decided to call
+#   result   what that tool returned
+#   message  assistant text
+#   done     end of turn
+POST {{APP_BASE_URL}}/api/chat
+Content-Type: application/json
+Accept: text/event-stream
+
+{
+  "message": "How many orders are in the database? Use the tools to check.",
+  "sessionId": "{{CHAT_SESSION}}"
+}
