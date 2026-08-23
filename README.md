@@ -89,6 +89,23 @@ bridge further providers.
 > constructed**, so a missing key throws at startup. `Claude` does not — it
 > fails at first use instead.
 
+## Wren's official skill guides
+
+Wren publishes workflow guides through its CLI (`wren skills get usage`). The
+agent loads the `usage` guide at startup and appends it to the instruction, so
+the querying workflow is the vendor's own rather than a paraphrase.
+
+One wrinkle: those guides are written for an agent driving the **CLI** —
+`wren --sql '...'`, `wren memory recall -q '...'`. An ADK agent has no shell,
+only Wren's **MCP tools**. Handed the guide verbatim a model will try to run
+commands it cannot run, so `WrenSkills` prepends a translation table
+(`wren --sql` → `run_sql`, `wren memory recall` → `recall_queries`, …) and tells
+the model to skip the install/configure sections.
+
+Loading shells out to the CLI, so it works when `wren` is on PATH — the wrenai
+base image, or `STDIO` transport. With a remote HTTP Wren it degrades quietly to
+the built-in instruction. Disable with `wren.adk.skills.enabled=false`.
+
 ## Configuration
 
 ```yaml
@@ -100,6 +117,10 @@ wren:
     read-only: true              # withhold Wren's store_query write tool
     transpile-only: false        # true = plan SQL but never touch the warehouse
     instruction: ""              # blank keeps the built-in analytics prompt
+    skills:
+      enabled: true              # append Wren's own guides to the instruction
+      names: [usage]             # `usage` is the querying workflow
+      command: wren
     anthropic:
       api-key: ${ANTHROPIC_API_KEY:}       # x-api-key
       auth-token: ${ANTHROPIC_AUTH_TOKEN:} # Authorization: Bearer (wins)
@@ -186,7 +207,9 @@ fixture, and Wren serving MCP over HTTP against it.
 | `WrenMcpIntegrationTest` | Wren exposes its tool surface; `store_query` stays hidden when read-only |
 | `WrenAdkAutoConfigurationTest` | The starter wires a toolset, agent and runner that resolve against live Wren |
 | `WrenLlmProviderTest` | `provider` selects the right `BaseLlm`; per-provider default models |
-| `AnthropicCompatibleLiveTest` | Live call against the configured endpoint — **skipped unless `ANTHROPIC_BASE_URL` is set**, so the default suite stays offline and free |
+| `WrenSkillsTest` | Guide loading, front-matter stripping, and quiet degradation when the CLI is absent |
+| `AnthropicCompatibleLiveTest` | Live call against the configured endpoint — **skipped unless `ANTHROPIC_BASE_URL` is set** |
+| `WrenAgentLiveTest` | Full loop: model calls Wren tools, Wren queries Postgres, model answers from the result — also gated on `ANTHROPIC_BASE_URL` |
 
 The fixture (`app/src/test/resources/db/eshop.sql`, 1,120 rows across 8 tables)
 is a referentially-intact subset of the WrenAI demo dataset. **It is synthetic —

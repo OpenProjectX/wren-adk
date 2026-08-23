@@ -32,6 +32,7 @@ data class WrenAdkProperties(
      */
     val transpileOnly: Boolean = false,
     val mcp: Mcp = Mcp(),
+    val skills: Skills = Skills(),
     val anthropic: Anthropic = Anthropic(),
     val gemini: Gemini = Gemini(),
 ) {
@@ -42,6 +43,22 @@ data class WrenAdkProperties(
             WrenLlmProvider.ANTHROPIC -> "claude-sonnet-4-5"
         }
     }
+
+    /**
+     * Wren's own workflow guides, appended to the agent instruction.
+     *
+     * Loaded by shelling out to `wren skills get <name>`, so this only works
+     * when the CLI is on PATH — true for the wrenai base image and for STDIO
+     * transport, not for a remote HTTP Wren. Loading is best-effort: on failure
+     * the agent keeps the built-in instruction.
+     */
+    data class Skills(
+        val enabled: Boolean = true,
+        /** Guides to load. `usage` is the querying workflow; the rest are setup. */
+        val names: List<String> = listOf("usage"),
+        val command: String = "wren",
+        val timeout: Duration = Duration.ofSeconds(20),
+    )
 
     /**
      * Gemini settings. Leave [apiKey] unset to read `GOOGLE_API_KEY` from the

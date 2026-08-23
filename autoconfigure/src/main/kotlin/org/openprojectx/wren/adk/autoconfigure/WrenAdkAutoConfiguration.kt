@@ -14,11 +14,13 @@ import org.openprojectx.wren.adk.WrenAnthropicSettings
 import org.openprojectx.wren.adk.WrenGeminiSettings
 import org.openprojectx.wren.adk.WrenLlms
 import org.openprojectx.wren.adk.WrenMcpSettings
+import org.openprojectx.wren.adk.WrenSkills
 import org.openprojectx.wren.adk.WrenToolsets
 import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
+import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
 
 /**
@@ -34,6 +36,8 @@ import org.springframework.context.annotation.Bean
 @EnableConfigurationProperties(WrenAdkProperties::class)
 @ConditionalOnProperty(prefix = "wren.adk", name = ["enabled"], havingValue = "true", matchIfMissing = true)
 class WrenAdkAutoConfiguration {
+
+    private val log = LoggerFactory.getLogger(javaClass)
 
     /** Closed on context shutdown, which terminates the spawned `wren` process in STDIO mode. */
     @Bean(destroyMethod = "close")
@@ -85,8 +89,34 @@ class WrenAdkAutoConfiguration {
             llm = llm,
             toolset = toolset,
             name = properties.agentName,
-            instruction = properties.instruction.ifBlank { DEFAULT_WREN_INSTRUCTION },
+            instruction = instruction(properties),
         )
+
+    /**
+     * The built-in instruction, plus Wren's own workflow guides when the CLI can
+     * supply them. An explicit `wren.adk.instruction` replaces the built-in but
+     * still gets the guides appended.
+     */
+    private fun instruction(properties: WrenAdkProperties): String {
+        val base = properties.instruction.ifBlank { DEFAULT_WREN_INSTRUCTION }.trimIndent()
+        if (!properties.skills.enabled) return base
+
+        val guides = WrenSkills.load(
+            names = properties.skills.names,
+            command = properties.skills.command,
+            timeout = properties.skills.timeout,
+        )
+        return if (guides == null) {
+            log.info(
+                "Wren skill guides {} unavailable via '{}' — using the built-in instruction only",
+                properties.skills.names, properties.skills.command,
+            )
+            base
+        } else {
+            log.info("Loaded Wren skill guides {} ({} chars)", properties.skills.names, guides.length)
+            base + "\n\n---\n\n" + guides
+        }
+    }
 
     @Bean
     @ConditionalOnMissingBean
