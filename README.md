@@ -30,6 +30,14 @@ ADK Dev UI ───┘              │
 | `app` | — | ADK Dev UI host, Jib image, integration tests |
 | `ui` | `@openprojectx/wren-adk-ui` | Bun, Vite, React and the official A2UI renderer |
 
+## Enterprise platform design
+
+This repository is the agent/runtime foundation, not by itself a complete
+enterprise data platform. The target control plane, federated Wren runtime
+model, governance lifecycle, SDLC, identity, audit, scaling, ownership, risk,
+and phased delivery plan are maintained in
+[`docs/enterprise-platform-design.md`](docs/enterprise-platform-design.md).
+
 ## Quick start
 
 ```shell
